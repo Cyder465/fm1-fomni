@@ -20,36 +20,63 @@ firmware back, and an FM-1 that keeps crashing starts in a safe mode.
 
 ## Playing
 
+This version adds the Suzuki Q Chord's way of playing: EZ Play, Auto Chord and Chord Plus, a choice of 53 voices
+for the strum plate, the chord and the chord plus, Vibrato and Reverb buttons, three level controls, and a pitch
+bend for the strum plate.
+
 | | |
 |---|---|
 | White keys | The strum plate. Each key plucks one string of the chord. As on the Omnichord, each group of three keys is root, third and fifth, five groups up, folded into an F#–F window, with one more root on top. |
 | Black keys | The chord buttons, F C G, Dm Am, Em G7 E7, D7 Bb and A7 at first. Hold **ENV** for the minor, **LFO** for the 7th, or both for the m7, like the Omnichord's three rows. |
-| PLAY | Starts and stops the rhythm. |
-| REC | Turns on SYNC START, so the rhythm waits for your first chord. |
+| REC | **EZ PLAY** on or off. It's on at first: no rhythm, just the chord buttons and the strum plate. |
+| SEQ | **AUTO CHORD** on or off: the chord section. With it off (and Chord Plus off), the chord buttons only change the strum plate's notes. |
+| SEL | **CHORD PLUS** on or off. With the rhythm, it adds a figure of its own to each style. Played by hand (EZ Play, or the rhythm stopped), it adds the chord an octave up and the bass. |
+| FX | **REVERB** on or off (Rev depth and Space on the Sound page). |
+| GLO | **VIBRATO** on or off, on the strum plate (Vib depth on the Sound page). It fades in over a quarter second on each pluck. |
+| PLAY | Starts and stops the rhythm. Pressing it in EZ Play turns EZ Play off first. Turning EZ Play on stops the rhythm. |
 | ARP | Turns on CHORD HOLD, so the chord keeps playing after you let go. Press the same chord button again to stop it. |
 | OCT− / OCT+ | Move the strum plate down or up an octave. |
 | SELECT | Sets the tempo. |
 | ALGORITHM | Picks the rhythm. |
-| PRESETS | Transposes, from −6 to +6. |
+| PRESETS | **PITCH BEND** on the strum plate. Each click bends further (five clicks reach the Bend range set on the Setup page, 2 semitones at first). When you stop turning, it springs back to pitch. |
+| HOME / EDIT | HOME goes to the Play page. EDIT steps through the pages. |
 | KNOB 1–4 | Set the four values on the screen. The pages below list them. |
 | SAVE | Saves. FoMni also saves by itself a few seconds after a change, once it's quiet. |
+
+The top right of the screen shows which of AUTO, PLUS, VIB and REV are on, and the buttons light up to match.
 
 ### The pages
 
 Each page puts four values on KNOB 1–4. Press EDIT to step through the pages.
 
-- The Play page (**HOME**) has Voice 1, Voice 2, Sustain and Chord level.
-- The Rhythm page (**SEQ**) has Rhythm, Tempo, Drums level and Auto bass. With Auto bass on, the bass and chord
-  play in time with the rhythm.
-- The Sound page (**FX**) has Reverb, how much of the strings go to the reverb; Space, the plate's size; Width; and
-  Chord rev, how much of the chord and bass go to the reverb. The drums stay dry.
-- On the Chords page (**SEL**), you can change the chord on any black key. Press the key, then turn Root (KNOB 1)
-  and Type (KNOB 2). KNOB 3 and 4 set Transpose and Octave.
-- The Setup page (**GLO**) has Tune, MIDI out and Lights. With Lights on, the keys light up and the unlit buttons
-  glow dimly so you can find them. With Keys, only the keys light. Off turns the lights off.
+- **Play** (HOME) has Strum, the strum plate's voice; Chord, the chord's voice; Plus, Chord Plus's voice; and Sustain, how long the strum plate rings (0.25 s to 12 s).
+- **Mix** has the three Q Chord levels, Strum vol, Chord vol (the chord and chord plus) and Drum vol, plus Bass vol.
+- **Rhythm** has Rhythm, Tempo, Bass (the bass line on or off) and Sync start (the rhythm waits for your first chord).
+- **Sound** has Rev depth, Space (the plate's size), Vib depth and Width. The drums stay dry.
+- On **Chords**, you can change the chord on any black key. Press the key, then turn Root (KNOB 1) and Type
+  (KNOB 2). KNOB 3 and 4 set Transpose and Octave.
+- **Setup** has Tune, MIDI out, Lights and Bend (the pitch bend's range, 1 to 12 semitones).
 
-**Voice 1** is the Omnichord's shimmering harp, and **Voice 2** is its plain one. Mix them, and
-set how long the strings ring with **Sustain**.
+### The voices
+
+All three parts choose from the same list. **Omni 1** is the Omnichord's shimmering harp on the strum plate (and its
+organ on the chord), and **Omni 2** is its plain harp. The others: Piano, E.Piano, Harpsichd, Clavinet, Celesta,
+Glocken, Music Box, Vibes, Marimba, Xylophone, Bells, Kalimba, SteelDrum, Organ, PercOrgan, RockOrgan, Church,
+Accordion, Harmonica, Nylon Gtr, Steel Gtr, Jazz Gtr, Mute Gtr, Dist Gtr, Banjo, Sitar, Dulcimer, Harp, Pizzicato,
+Bass, SynthBass, Violin, Cello, Strings, SynString, Choir, Trumpet, Brass, Sax, Clarinet, Oboe, Flute, Pan Flute,
+Ocarina, Calliope, Sq Lead, Saw Lead, PolySynth, Warm Pad, Halo Pad and Metal Pad. They're small synth patches
+(wavetable and two-operator FM; `firmware/src/dsp/om_voices.h`), levelled to match the Omni harp. Plucked voices
+fade with Sustain. Held voices like organ, strings and winds fade slowly on the strum plate and hold on the chord.
+
+### How the chord section plays
+
+| | Chord button held, by hand (EZ Play, or the rhythm stopped) | With the rhythm running |
+|---|---|---|
+| AUTO CHORD | the chord, held | the chord, in the rhythm's pattern |
+| CHORD PLUS | the chord an octave up, and the bass | the style's own figure |
+| Bass (Rhythm page) | the bass, held (not in EZ Play) | the rhythm's bass line |
+
+MIDI out sends Chord Plus on channel 4.
 
 ### MIDI
 

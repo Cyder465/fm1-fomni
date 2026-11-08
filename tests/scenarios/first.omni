@@ -1,4 +1,4 @@
-# a first look and listen: a C chord strummed, Am with the pad held, the rhythm with auto bass
+# a first look and listen: a C chord strummed, Am with the pad held (EZ PLAY), the rhythm with auto bass
 wav first.wav
 wait 300
 shot home.png
@@ -19,11 +19,15 @@ shot chord.png
 key b4 up
 wait 400
 expect chord_level <5
+# PLAY leaves EZ PLAY and starts the rhythm
 tap PLAY
 expect playing 1
+expect par20 0
 key b1 down
 wait 3000
-tap SEQ
+tap EDIT
+tap EDIT
+expect view 2
 wait 100
 shot rhythm.png
 key b1 up
@@ -33,15 +37,23 @@ wait 500
 wavstop
 expect peak_db_max -0.1
 expect peak_db_min -24
-tap FX
+tap EDIT
+expect view 3
 shot sound.png
-tap SEL
+tap EDIT
+expect view 4
 key b6 down
 key b6 up
 spin K2 1
 wait 50
 shot pads.png
 expect padtype6 3
-tap GLO
+tap EDIT
+expect view 5
 wait 50
 shot setup.png
+tap EDIT
+expect view 0
+tap EDIT
+expect view 1
+shot mix.png

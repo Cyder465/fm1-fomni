@@ -6,6 +6,7 @@
 #include <string.h>
 #include <math.h>
 #include "omni.h"
+#define OM_NRHYTHM_TEST 10
 
 static int bad, midi_n;
 void om_midi_out(uint32_t st, uint32_t d1, uint32_t d2)
@@ -74,6 +75,7 @@ int main(void)
     }
 
     om_init();
+    om_set(P_EZ, 0);                                   /* the rhythm's tests: not in EZ PLAY */
     om_chord(0, CH_MAJ);
     om_strum(0);
     run(2);
@@ -111,8 +113,8 @@ int main(void)
     }
     {   /* everything at once, levels up: finite and inside full scale */
         int i, s;
-        om_set(P_VOICE1, 100);
-        om_set(P_VOICE2, 100);
+        om_set(P_SVOL, 100);
+        om_set(P_PLUS, 1);
         om_set(P_CHORD, 100);
         om_set(P_RHYVOL, 100);
         om_set(P_REVERB, 100);
@@ -139,6 +141,7 @@ int main(void)
         run(1);                                        /* (om_init empties the queue) */
         om_init();
         om_set(P_REVERB, 100);
+        om_set(P_REVON, 1);
         om_set(P_SPACE, 100);
         om_set(P_SUSTAIN, 0);
         om_strum(8);
@@ -151,6 +154,88 @@ int main(void)
                 e0 = e;
         }
         check("plate at Space 100: the tail is 60 dB down within 20 s", e < e0 * 1e-6);
+    }
+    {   /* every voice: a pluck sounds, stays finite and ends; held on the chord, it sounds and ends when let go */
+        int ii, ok_s = 1, ok_c = 1;
+        for (ii = 0; ii < om_ninst(); ii++) {
+            int b;
+            om_init();
+            om_set(P_SVOICE, ii);
+            om_set(P_CVOICE, ii);
+            om_set(P_SUSTAIN, 50);
+            om_chord(0, CH_MAJ);
+            om_strum(6);
+            run(20);
+            if (!(om_str_level[6] > 0.05f)) {
+                printf("  voice %d (%s): the pluck does not sound\n", ii, om_inst_name(ii));
+                ok_s = 0;
+            }
+            for (b = 0; b < 44100 * 25 / 256 && om_str_level[6] > 0.0f; b++)
+                run(1);
+            if (om_str_level[6] != 0.0f) {
+                printf("  voice %d (%s): the pluck does not end in 25 s\n", ii, om_inst_name(ii));
+                ok_s = 0;
+            }
+            om_gate(1);
+            run(10);
+            if (!(om_chord_level > 0.0f)) {
+                printf("  voice %d (%s): the chord does not sound\n", ii, om_inst_name(ii));
+                ok_c = 0;
+            }
+            om_gate(0);
+            run(44100 * 2 / 256);
+            if (om_chord_level != 0.0f) {
+                printf("  voice %d (%s): the chord does not end within 2 s of letting go\n", ii, om_inst_name(ii));
+                ok_c = 0;
+            }
+        }
+        check("every voice on the strum plate: sounds, ends", ok_s);
+        check("every voice on the chord: sounds, ends when let go", ok_c && finite_ok);
+    }
+    {   /* the CHORD PLUS figures fit their rhythms */
+        int r, ok = 1;
+        for (r = 0; r < OM_NRHYTHM_TEST; r++)
+            ok &= (int)strlen(om_plus_pattern(r)) == om_rhythm(r)->len;
+        check("CHORD PLUS: a figure as long as each rhythm", ok);
+    }
+    {   /* EZ PLAY: no rhythm; the chord without its bass; CHORD PLUS adds the bass; AUTO CHORD off: silent */
+        om_init();
+        om_chord(0, CH_MAJ);
+        om_play(1);
+        run(4);
+        check("EZ PLAY (the default): PLAY does not start the rhythm", !om_playing);
+        om_gate(1);
+        run(10);
+        check("EZ PLAY: a chord button sounds the chord, not the bass", om_chord_level > 0.5f && om_bass_level == 0.0f);
+        om_set(P_PLUS, 1);
+        run(10);
+        check("EZ PLAY + CHORD PLUS: the bass comes in", om_bass_level > 0.5f);
+        om_set(P_AUTOCH, 0);
+        om_set(P_PLUS, 0);
+        run(44100 / 256);
+        check("AUTO CHORD and CHORD PLUS off: only the strum plate", om_chord_level == 0.0f && om_bass_level == 0.0f);
+        om_gate(0);
+        om_set(P_AUTOCH, 1);
+        om_set(P_EZ, 0);
+        om_play(1);
+        run(4);
+        check("EZ PLAY off: PLAY starts the rhythm", om_playing);
+        om_set(P_EZ, 1);
+        run(2);
+        check("EZ PLAY on: the rhythm stops", !om_playing);
+    }
+    {   /* the bend: a held bend and the vibrato stay finite; the bend comes back */
+        om_init();
+        om_set(P_VIB, 1);
+        om_set(P_VIBDEPTH, 100);
+        om_bend(100);
+        om_strum(4);
+        run(50);
+        om_bend(-100);
+        run(50);
+        om_bend(0);
+        run(50);
+        check("bend and vibrato: finite", finite_ok);
     }
     check("MIDI out sent notes", midi_n > 100);
     om_set(P_MIDI, 0);

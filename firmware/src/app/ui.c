@@ -4,23 +4,33 @@
  *
  *   white keys     the strum plate: each one plucks a string of the chord
  *   black keys     the chord buttons; hold ENV for the minor, LFO for the 7th, both for the m7
- *   PLAY           the rhythm on / off (with SYNC START: it waits for the first chord)
- *   REC            SYNC START          ARP   CHORD HOLD          OCT- / OCT+   the plate's octave
- *   HOME SEQ FX SEL GLO   the pages: PLAY, RHYTHM, SOUND, CHORDS, SETUP (EDIT steps through them)
- *   SELECT tempo   ALGORITHM rhythm   PRESETS transpose   KNOB 1-4 the page's four values
+ *   REC            EZ PLAY: no rhythm, just the chord buttons and the strum plate
+ *   SEQ            AUTO CHORD: the chord section on / off (off, the buttons only change the strum plate)
+ *   SEL            CHORD PLUS: with the rhythm, a figure of its own; by hand, the chord an octave up + bass
+ *   FX             REVERB on / off          GLO   VIBRATO on / off (the strum plate)
+ *   PLAY           the rhythm on / off (it leaves EZ PLAY; with SYNC START it waits for the first chord)
+ *   ARP            CHORD HOLD          OCT- / OCT+   the plate's octave
+ *   HOME           the Play page       EDIT   the next page (Play, Mix, Rhythm, Sound, Chords, Setup)
+ *   SELECT tempo   ALGORITHM rhythm    PRESETS the PITCH BEND (the strum plate): turn and it bends, let
+ *                  go and it springs back      KNOB 1-4 the page's four values
  *   SAVE           saves (it also saves by itself, a few seconds after a change, when quiet) */
 
-enum { V_PLAY, V_RHYTHM, V_SOUND, V_PADS, V_SETUP, NVIEWS };
-static const char *const VIEW_NAME[NVIEWS] = {"Play", "Rhythm", "Sound", "Chords", "Setup"};
+enum { V_PLAY, V_MIX, V_RHYTHM, V_SOUND, V_PADS, V_SETUP, NVIEWS };
+static const char *const VIEW_NAME[NVIEWS] = {"Play", "Mix", "Rhythm", "Sound", "Chords", "Setup"};
 /* the four knobs of each page: a parameter, or one of these */
-enum { K_PADROOT = 100, K_PADTYPE, K_LEDS, K_NONE };
+enum { K_PADROOT = 100, K_PADTYPE, K_LEDS, K_SYNC, K_NONE };
 static const uint8_t VIEW_KNOB[NVIEWS][4] = {
-    {P_VOICE1, P_VOICE2, P_SUSTAIN, P_CHORD},
-    {P_RHYTHM, P_TEMPO, P_RHYVOL, P_ABC},
-    {P_REVERB, P_SPACE, P_WIDTH, P_CREV},
+    {P_SVOICE, P_CVOICE, P_PVOICE, P_SUSTAIN},
+    {P_SVOL, P_CHORD, P_RHYVOL, P_BASSVOL},
+    {P_RHYTHM, P_TEMPO, P_BASS, K_SYNC},
+    {P_REVERB, P_SPACE, P_VIBDEPTH, P_WIDTH},
     {K_PADROOT, K_PADTYPE, P_TRANSPOSE, P_OCTAVE},
-    {P_TUNE, P_MIDI, K_LEDS, K_NONE},
+    {P_TUNE, P_MIDI, K_LEDS, P_BENDRANGE},
 };
+/* the buttons that turn a part on and off, and the parameter each one flips */
+static const uint8_t TOGGLE_BTN[5] = {B_REC, B_SEQ, B_SEL, B_FX, B_GLO};
+static const uint8_t TOGGLE_PAR[5] = {P_EZ, P_AUTOCH, P_PLUS, P_REVON, P_VIB};
+static const char *const TOGGLE_SAID[5] = {"EZ PLAY", "AUTO CHORD", "CHORD PLUS", "REVERB", "VIBRATO"};
 
 static const uint8_t WHITE_K[OM_NSTR] = {0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19, 21, 23, 24, 26};
 static const uint8_t BLACK_K[NPADS] = {1, 3, 5, 8, 10, 13, 15, 17, 20, 22, 25};
@@ -57,6 +67,8 @@ static struct {
     uint32_t touch_until;
     uint32_t frame;
     uint32_t sig[3];                   /* what each band shows: redrawn when it changes */
+    int16_t bend;                      /* the pitch bend (PRESETS), -100..100: springs back to 0 */
+    uint32_t bend_t, bend_ms;          /* the last turn; the last spring step */
 } ui;
 
 static uint8_t sp_said;                 /* a message went to the screen reader this frame: speak() leaves it be */
@@ -143,6 +155,8 @@ static int knob_get(int k)
         return proj.pad_type[ui.pad_sel];
     if (k == K_LEDS)
         return proj.leds;
+    if (k == K_SYNC)
+        return proj.sync;
     return 0;
 }
 static void knob_range(int k, int *lo, int *hi)
@@ -152,14 +166,14 @@ static void knob_range(int k, int *lo, int *hi)
         *hi = om_param_info(k)->hi;
     } else {
         *lo = 0;
-        *hi = k == K_PADROOT ? 11 : k == K_PADTYPE ? CH_NTYPES - 1 : k == K_LEDS ? 2 : 0;
+        *hi = k == K_PADROOT ? 11 : k == K_PADTYPE ? CH_NTYPES - 1 : k == K_LEDS ? 2 : k == K_SYNC ? 1 : 0;
     }
 }
 static const char *knob_name(int k)
 {
     if (k < P_NPARAMS)
         return om_param_info(k)->name;
-    return k == K_PADROOT ? "Root" : k == K_PADTYPE ? "Type" : k == K_LEDS ? "Lights" : "";
+    return k == K_PADROOT ? "Root" : k == K_PADTYPE ? "Type" : k == K_LEDS ? "Lights" : k == K_SYNC ? "Sync start" : "";
 }
 static void knob_text(int k, char *b)
 {
@@ -176,6 +190,10 @@ static void knob_text(int k, char *b)
             ;
     } else if (k == K_LEDS) {                    /* On: the keys, and the unlit buttons glow; Keys: no glow */
         const char *n = v == 2 ? "Keys" : v ? "On" : "Off";
+        while ((*b++ = *n++))
+            ;
+    } else if (k == K_SYNC) {
+        const char *n = v ? "On" : "Off";
         while ((*b++ = *n++))
             ;
     } else {
@@ -206,6 +224,10 @@ static void knob_set(int k, int v)
         }
     } else if (k == K_LEDS) {
         proj.leds = (uint8_t)v;
+    } else if (k == K_SYNC) {
+        proj.sync = (uint8_t)v;
+        if (!v)
+            ui.armed = 0;
     }
     mark_dirty();
 }
@@ -286,16 +308,33 @@ static void set_view(int v)
     ui.touched = -1;
 }
 
+static void toggle(int t)
+{
+    int p = TOGGLE_PAR[t], on = !proj.par[p];
+    knob_set(p, on);
+    if (p == P_EZ && on) {                       /* EZ PLAY: the rhythm stops (the engine stops it too) */
+        ui.armed = 0;
+        om_play(0);
+    }
+    say(TOGGLE_SAID[t], on ? "ON" : "OFF");
+}
+
 static void button(int b)
 {
+    int t;
+    for (t = 0; t < 5; t++)
+        if (b == TOGGLE_BTN[t]) {
+            toggle(t);
+            return;
+        }
     switch (b) {
     case B_HOME: set_view(V_PLAY); break;
-    case B_SEQ: set_view(V_RHYTHM); break;
-    case B_FX: set_view(V_SOUND); break;
-    case B_SEL: set_view(V_PADS); break;
-    case B_GLO: set_view(V_SETUP); break;
     case B_EDIT: set_view((ui.view + 1) % NVIEWS); break;
     case B_PLAY:
+        if (proj.par[P_EZ] && !om_playing) {     /* PLAY leaves EZ PLAY: the rhythm comes back */
+            knob_set(P_EZ, 0);
+            say("EZ PLAY", "OFF");
+        }
         if (om_playing) {
             om_play(0);
             ui.armed = 0;
@@ -308,13 +347,6 @@ static void button(int b)
         } else {
             om_play(1);
         }
-        break;
-    case B_REC:
-        proj.sync = (uint8_t)!proj.sync;
-        if (!proj.sync)
-            ui.armed = 0;
-        say("SYNC START", proj.sync ? "ON" : "OFF");
-        mark_dirty();
         break;
     case B_ARP:
         proj.hold = (uint8_t)!proj.hold;
@@ -439,6 +471,38 @@ static void midi_in(void)
         kb_update();
 }
 
+/* PITCH BEND on the PRESETS encoder, like the Q Chord's wheel on the strum plate: each detent bends
+ * further (5 to the full reach, Setup's Bend semitones), and a moment after the last one it springs
+ * back to the pitch */
+#define BEND_STEP 20
+#define BEND_HOLD_MS 150u                      /* still turning: it stays where it is */
+#define BEND_BACK_MS 120u                      /* then back from full in this long */
+static void bend_input(void)
+{
+    uint32_t now = plat_ms();
+    int32_t e = plat_enc(EN_PRESET);
+    int b = ui.bend;
+    if (e) {
+        b += (int)e * BEND_STEP;
+        b = b < -100 ? -100 : b > 100 ? 100 : b;
+        ui.bend_t = ui.bend_ms = now;
+        ui.act_t = now;
+    } else if (b && now - ui.bend_t > BEND_HOLD_MS) {
+        int d = (int)((now - ui.bend_ms) * 100u / BEND_BACK_MS);
+        if (!d)
+            return;
+        ui.bend_ms = now;
+        b = b > 0 ? (b > d ? b - d : 0) : (b < -d ? b + d : 0);
+    } else {
+        ui.bend_ms = now;
+        return;
+    }
+    if (b != ui.bend) {
+        ui.bend = (int16_t)b;
+        om_bend(b);
+    }
+}
+
 static void input(void)
 {
     uint32_t btn = plat_buttons(), keys = plat_keys(), ch, i;
@@ -476,8 +540,7 @@ static void input(void)
         turn(EN_SELECT, P_TEMPO, e);
     if ((e = plat_enc(EN_ALGO)) != 0)
         knob_set(P_RHYTHM, proj.par[P_RHYTHM] + (e > 0 ? 1 : -1));
-    if ((e = plat_enc(EN_PRESET)) != 0)
-        knob_set(P_TRANSPOSE, proj.par[P_TRANSPOSE] + (e > 0 ? 1 : -1));
+    bend_input();
     for (i = 0; i < 4; i++)
         if ((e = plat_enc(EN_K1 + (int)i)) != 0) {
             turn(EN_K1 + (int)i, VIEW_KNOB[ui.view][i], e);
@@ -523,8 +586,9 @@ static void draw_header(void)
 {
     char t[24];
     int msg = plat_ms() < ui.msg_until;
+    int ez = proj.par[P_EZ] && !om_playing;
     uint32_t h = hash(hash(hash(2166136261u, ui.view), om_playing | ui.armed << 1 | proj.hold << 2 | proj.sync << 3 |
-                                                       ui.dirty << 4 | (uint32_t)msg << 5),
+                                                       ui.dirty << 4 | (uint32_t)msg << 5 | (uint32_t)ez << 6),
                       (uint32_t)proj.par[P_RHYTHM] << 8 | (uint32_t)proj.par[P_TEMPO] | (uint32_t)om_ext << 20);
     if (msg)
         h = hash(hash(h, (uint32_t)ui.msg[0][0] << 8 | ui.msg[0][1]), ui.msg_until);
@@ -541,7 +605,11 @@ static void draw_header(void)
         int32_t x = 10;
         cv_text(x, 6, &FONT_B, VIEW_NAME[ui.view], K_TEXT);
         x = 232;
-        {   /* right: tempo, the rhythm, its state */
+        if (ez) {                                 /* EZ PLAY: no rhythm to show */
+            int32_t w = text_w(&FONT_S, "EZ PLAY") + 12;
+            cv_round(x - w, 5, w, 18, 6, K_CHORD);
+            cv_text(x - w + 6, 6, &FONT_S, "EZ PLAY", K_WHITE);
+        } else {   /* right: tempo, the rhythm, its state */
             if (om_ext) {                         /* following MIDI clock */
                 t[0] = 'E';
                 t[1] = 'X';
@@ -660,6 +728,9 @@ static void draw_main(void)
              (uint32_t)proj.par[P_TRANSPOSE] << 8 | (uint32_t)(om_chord_level * 8.0f));
     for (s = 0; s < NPADS; s++)
         h = hash(h, proj.pad_root[s] | proj.pad_type[s] << 4);
+    h = hash(hash(h, (uint32_t)proj.par[P_AUTOCH] | (uint32_t)proj.par[P_PLUS] << 1 | (uint32_t)proj.par[P_VIB] << 2 |
+                         (uint32_t)proj.par[P_REVON] << 3),
+             (uint32_t)(ui.bend + 100));
     if (ui.view == V_RHYTHM)
         h = hash(hash(h, om_playing ? om_step : 255u), (uint32_t)proj.par[P_RHYTHM]);
     if (h == ui.sig[1])
@@ -685,7 +756,24 @@ static void draw_main(void)
                 notes[k++] = *n++;
         }
         notes[k] = 0;
-        cv_text(240 - 12 - text_w(&FONT_S, notes), 14, &FONT_S, notes, K_DIM);
+        cv_text(240 - 12 - text_w(&FONT_S, notes), 20, &FONT_S, notes, K_DIM);
+    }
+    {   /* the parts on and off (SEQ, SEL, GLO, FX), right to left at the top */
+        static const char *const TAG[4] = {"REV", "VIB", "PLUS", "AUTO"};
+        const int on[4] = {proj.par[P_REVON], proj.par[P_VIB], proj.par[P_PLUS], proj.par[P_AUTOCH]};
+        int32_t x = 228, i;
+        for (i = 0; i < 4; i++) {
+            int32_t w = text_w(&FONT_XS, TAG[i]) + 8;
+            x -= w;
+            cv_round(x, 2, w, 14, 5, on[i] ? K_CHORD : K_PANEL);
+            cv_text(x + 4, 2, &FONT_XS, TAG[i], on[i] ? K_WHITE : K_DIM);
+            x -= 3;
+        }
+    }
+    if (ui.bend) {   /* the bend: a bar from the middle */
+        int32_t m = 196, e = m + ui.bend * 30 / 100;
+        cv_rect(m - 30, 39, 61, 1, K_LINE);
+        cv_round(e < m ? e : m, 37, (e < m ? m - e : e - m) + 2, 5, 2, K_HARP);
     }
     if (ui.view == V_RHYTHM)
         draw_rhythm(44, 62);
@@ -725,7 +813,9 @@ static void draw_knobs(void)
             int lower = 0;
             for (; *q; q++)
                 lower |= *q >= 'a' && *q <= 'z';
-            if (lower || text_w(&FONT_M, t) > 56)
+            if (text_w(&FONT_B, t) > 58)             /* a voice's long name */
+                text_c(cx, 28, &FONT_XS, t, hot ? K_HARP : K_TEXT);
+            else if (lower || text_w(&FONT_M, t) > 56)
                 text_c(cx, 26, &FONT_B, t, hot ? K_HARP : K_TEXT);
             else
                 text_c(cx, 22, &FONT_M, t, hot ? K_HARP : K_TEXT);
@@ -745,14 +835,14 @@ static void draw_knobs(void)
 static void leds(void)
 {
     uint32_t b = 0, k = 0, i;
-    static const uint8_t VIEW_BTN[NVIEWS] = {B_HOME, B_SEQ, B_FX, B_SEL, B_GLO};
-    b |= 1u << VIEW_BTN[ui.view];
+    b |= 1u << (ui.view == V_PLAY ? B_HOME : B_EDIT);
     if (om_playing)
         b |= (om_step & 3u) < 2u ? 1u << B_PLAY : 0u;
     else if (ui.armed && (ui.frame / 8u) & 1u)
         b |= 1u << B_PLAY;
-    if (proj.sync)
-        b |= 1u << B_REC;
+    for (i = 0; i < 5; i++)                      /* the parts that are on */
+        if (proj.par[TOGGLE_PAR[i]])
+            b |= 1u << TOGGLE_BTN[i];
     if (proj.hold)
         b |= 1u << B_ARP;
     if (proj.leds) {
@@ -789,7 +879,8 @@ static void autosave(void)
  * with its knobs; a knob's value as it turns; the chord a button (or MIDI) plays; play and stop; what a
  * button did (say). WHERE (the reader asks, or it has just started listening) is everything on the screen.
  * Nothing is built while no reader listens. */
-#define SP_NV (P_NPARAMS + 3)                  /* the values watched: the parameters, the button's root and type, lights */
+#define SP_NV (P_NPARAMS + 4)                  /* the values watched: the parameters, the button's root and type, lights,
+                                                * sync start */
 static struct {
     uint32_t ctx;                              /* the page, hashed: a change is said */
     int32_t chord;                             /* the chord said last: button | root | type, -1 none */
@@ -862,6 +953,15 @@ static void sp_screen(int all)
         sp_cat(t);
     }
     sp_cat(om_playing ? ", playing" : ui.armed ? ", waiting for a chord" : ", stopped");
+    if (proj.par[P_EZ])
+        sp_cat(". EZ Play on");
+    sp_cat(proj.par[P_AUTOCH] ? ". Auto chord on" : ". Auto chord off");
+    if (proj.par[P_PLUS])
+        sp_cat(". Chord plus on");
+    if (proj.par[P_VIB])
+        sp_cat(". Vibrato on");
+    if (!proj.par[P_REVON])
+        sp_cat(". Reverb off");
     if (proj.hold)
         sp_cat(". Chord hold on");
     if (proj.sync)
@@ -970,6 +1070,8 @@ static void speak_dump(void)
                         proj.pad_root[0] = (uint8_t)x;
                     else if (k == K_PADTYPE)
                         proj.pad_type[0] = (uint8_t)x;
+                    else if (k == K_SYNC)
+                        proj.sync = (uint8_t)x;
                     else
                         proj.leds = (uint8_t)x;
                     sp_n = 0;

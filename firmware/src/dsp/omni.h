@@ -30,13 +30,21 @@ extern const int8_t OM_TYPE_TONES[CH_NTYPES][3];
 
 /* parameters: value ranges in om_param_info() */
 enum {
-    P_VOICE1, P_VOICE2, P_SUSTAIN, P_CHORD,          /* harp voice levels, harp sustain, chord + bass level */
-    P_RHYTHM, P_TEMPO, P_RHYVOL, P_ABC,               /* rhythm, BPM, rhythm level, auto bass sync */
-    P_REVERB, P_SPACE, P_TUNE, P_CREV,                /* the strings' reverb send, reverb size, tune (cents),
-                                                       * the chord and bass's reverb send (the drums are dry) */
-    P_TRANSPOSE, P_OCTAVE, P_WIDTH, P_MIDI,           /* semitones, harp octave, stereo width, MIDI out */
+    P_SVOICE, P_CVOICE, P_PVOICE, P_SUSTAIN,         /* the voices (om_inst_name): strum plate, chord, chord plus;
+                                                       * the strum plate's sustain */
+    P_SVOL, P_CHORD, P_RHYVOL, P_BASSVOL,             /* the levels: strum plate, chord (and chord plus), drums, bass */
+    P_RHYTHM, P_TEMPO, P_BASS,                        /* rhythm, BPM, the bass line on / off */
+    P_REVERB, P_SPACE, P_VIBDEPTH, P_WIDTH,           /* reverb depth, its size, vibrato depth, stereo width */
+    P_TRANSPOSE, P_OCTAVE,                            /* semitones, strum plate octave */
+    P_TUNE, P_MIDI, P_BENDRANGE,                      /* cents, MIDI out, the bend's reach (semitones) */
+    P_EZ, P_AUTOCH, P_PLUS, P_VIB, P_REVON,           /* the buttons, on / off: EZ PLAY, AUTO CHORD, CHORD PLUS,
+                                                       * VIBRATO, REVERB */
     P_NPARAMS
 };
+/* the voices ("textures") the strum plate, the chord and the chord plus can take: 0 and 1 are the
+ * OM-84's own (the harp's two voices; on the chord section, the OM's organ) */
+int om_ninst(void);
+const char *om_inst_name(int i);
 typedef struct {
     const char *name;
     int16_t lo, hi, def;
@@ -53,6 +61,7 @@ typedef struct {
     uint8_t drum[32];
 } om_rhythm_t;
 const om_rhythm_t *om_rhythm(int i);
+const char *om_plus_pattern(int i);            /* CHORD PLUS's figure for rhythm i, as long as the rhythm */
 
 /* commands (main loop -> render) */
 void om_init(void);
@@ -62,6 +71,7 @@ void om_gate(int on);                          /* a chord pad held (1) / release
 void om_strum(int string);                     /* pluck string 0..15 */
 void om_play(int on);                          /* the rhythm: start (from its first step) / stop */
 void om_panic(void);                           /* everything quiet, now */
+void om_bend(int pos);                         /* the strum plate's pitch bend, -100..100 (of P_BENDRANGE) */
 /* MIDI clock in (the main loop passes it on): OM_CLK_TICK (F8), START, CONTINUE, STOP. While ticks keep
  * coming (the last within ~0.6 s) they drive the rhythm, 6 a step, and its own tempo stands aside;
  * otherwise the rhythm sends clock (24 a quarter note) and start / stop, with MIDI out on. */

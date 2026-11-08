@@ -3,15 +3,19 @@
 wait 200
 listen
 wait 100
-said Play page: Voice 1 80, Voice 2 45, Sustain 50, Chord 60. Chord C major. Rhythm Rock 1, tempo 116, stopped
+said Play page: Strum Omni 1, Chord Omni 1, Plus Piano, Sustain 50. Chord C major. Rhythm Rock 1, tempo 116, stopped. EZ Play on
 # a page settles before it is said
-tap SEQ
+tap EDIT
 wait 300
-said Rhythm page: Rhythm Rock 1, Tempo 116, Drums 70, Auto bass On
-tap FX
-tap GLO
+said Mix page: Strum vol 80, Chord vol 60, Drum vol 70, Bass vol 60
+tap EDIT
 wait 300
-said Setup page: Tune 0
+said Rhythm page: Rhythm Rock 1, Tempo 116, Bass On, Sync start Off
+tap EDIT
+tap EDIT
+tap EDIT
+wait 300
+said Setup page: Tune 0, MIDI out On, Lights On, Bend 2
 # a knob: its name and value, once it settles
 spin K1 3
 wait 300
@@ -23,12 +27,12 @@ said Tempo 118
 turn ALGO 1
 wait 300
 said Rhythm Rock 2
-turn PRESET 1
+# a voice, by name
+tap HOME
 wait 300
-said Transpose +1
-turn PRESET -1
+spin K1 9
 wait 300
-said Transpose 0
+said Strum Vibes
 # a chord button: its chord, at once (ENV held: the minor)
 key b1 down
 wait 50
@@ -41,6 +45,29 @@ said G minor
 key b2 up
 release ENV
 wait 100
+# the buttons' messages, said once
+tap REC
+said EZ PLAY OFF
+tap SEQ
+said AUTO CHORD OFF
+tap SEQ
+said AUTO CHORD ON
+tap SEL
+said CHORD PLUS ON
+tap SEL
+said CHORD PLUS OFF
+tap FX
+said REVERB OFF
+tap FX
+said REVERB ON
+tap GLO
+said VIBRATO ON
+tap GLO
+said VIBRATO OFF
+tap ARP
+said CHORD HOLD ON
+tap ARP
+said CHORD HOLD OFF
 # the transport
 tap PLAY
 wait 50
@@ -48,19 +75,6 @@ said Play
 tap PLAY
 wait 50
 said Stop
-# the buttons' messages, said once (OCT+ says its own: not again as a readout)
-tap ARP
-said CHORD HOLD ON
-tap ARP
-said CHORD HOLD OFF
-tap REC
-said SYNC START ON
-tap PLAY
-said WAITING FOR A CHORD
-tap PLAY
-said SYNC START CANCELLED
-tap REC
-said SYNC START OFF
 tap OCT+
 wait 300
 said OCTAVE +1
@@ -69,7 +83,10 @@ wait 300
 tap SAVE
 said SAVED
 # the CHORDS page: the button pressed, then a knob on it
-tap SEL
+tap EDIT
+tap EDIT
+tap EDIT
+tap EDIT
 key b6 down
 key b6 up
 wait 300

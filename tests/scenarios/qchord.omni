@@ -1,0 +1,87 @@
+# the Q Chord's controls: EZ PLAY, AUTO CHORD, CHORD PLUS, REVERB, VIBRATO, the voices, the bend
+wav qchord.wav
+wait 200
+# EZ PLAY (REC) is on from the start: a chord button sounds its chord, no bass, no rhythm
+expect par20 1
+key b1 down
+wait 100
+expect chord_level >50
+expect bass_level 0
+strum 0 15 25
+wait 300
+shot ez.png
+# CHORD PLUS (SEL) by hand: the bass comes in, with the chord an octave up
+tap SEL
+expect par22 1
+wait 100
+expect bass_level >50
+tap SEL
+expect par22 0
+wait 600
+expect bass_level 0
+# AUTO CHORD (SEQ) off: the buttons only change the strum plate
+tap SEQ
+expect par21 0
+wait 500
+expect chord_level 0
+key b1 up
+key b4 down
+wait 50
+expect root 9
+expect chord_level 0
+strum 0 15 25
+key b4 up
+tap SEQ
+expect par21 1
+# REVERB (FX) and VIBRATO (GLO)
+tap FX
+expect par24 0
+tap FX
+expect par24 1
+tap GLO
+expect par23 1
+shot toggles.png
+leds
+# the voices: the strum plate on Vibes (KNOB 1), the chord on Strings (KNOB 2)
+spin K1 9
+expect par0 9
+spin K2 35
+expect par1 35
+wait 50
+shot voices.png
+key b1 down
+wait 200
+expect chord_level >50
+strum 0 15 25
+wait 200
+# the bend (PRESETS): turned, it bends; let go, it comes back
+turn PRESET 3 20
+wait 20
+expect bend >50
+shot bend.png
+wait 400
+expect bend 0
+key b1 up
+wait 1000
+# EZ PLAY off, the rhythm with CHORD PLUS's figure
+tap REC
+expect par20 0
+tap SEL
+key b1 down
+tap PLAY
+expect playing 1
+wait 2500
+key b1 up
+tap PLAY
+expect playing 0
+# EZ PLAY on while it plays: the rhythm stops
+tap PLAY
+expect playing 1
+tap REC
+wait 50
+expect playing 0
+expect par20 1
+wait 500
+wavstop
+expect peak_db_max -0.1
+expect peak_db_min -30

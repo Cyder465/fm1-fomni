@@ -32,9 +32,17 @@ expect chord_level 0
 midi 90 3C 64
 wait 20
 expect strlevel4 >50
-# clock in: start, then ticks drive the steps (6 a step)
+# in EZ PLAY (the default) a MIDI start is ignored: there is no rhythm
 midi FA 00 00
 wait 5
+expect playing 0
+midi FC 00 00
+# EZ PLAY off (REC). Clock in: start, then ticks drive the steps (6 a step)
+tap REC
+expect par20 0
+wait 20
+midi FA 00 00
+wait 20
 expect playing 1
 wait 20
 midi F8 00 00
