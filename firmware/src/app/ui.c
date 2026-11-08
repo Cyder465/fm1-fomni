@@ -11,7 +11,8 @@
  *   PLAY           the rhythm on / off (it leaves EZ PLAY; with SYNC START it waits for the first chord)
  *   ARP            CHORD HOLD          OCT- / OCT+   the plate's octave
  *   HOME           the Play page       EDIT   the next page (Play, Mix, Rhythm, Sound, Chords, Setup)
- *   SELECT the KEY (transpose)   ALGORITHM rhythm    PRESETS the strum plate's SUSTAIN
+ *   SELECT the CHORD SET: what the black keys play (as set, or all major, minor, 7th, M7, m7, augmented,
+ *                  diminished, blues, minor blues)    ALGORITHM rhythm    PRESETS the strum plate's SUSTAIN
  *   KNOB 1-4       the page's four values; on the Play page KNOB 4 is the PITCH BEND (the strum plate):
  *                  turn and it bends, let go and it springs back (on the other pages, their own value)
  *   SAVE           saves (it also saves by itself, a few seconds after a change, when quiet) */
@@ -146,20 +147,17 @@ static void chord_name(int root, int type, char *b)
     *b = 0;
 }
 
-static void key_text(int tr, char *b)          /* the key SELECT sets, as a message: "D (+2)", "C" */
-{
-    const char *n = OM_NOTE_NAME[(tr % 12 + 12) % 12];
-    while (*n)
-        *b++ = *n++;
-    if (tr) {
-        *b++ = ' ';
-        *b++ = '(';
-        *b++ = tr > 0 ? '+' : '-';
-        *b++ = (char)('0' + (tr < 0 ? -tr : tr));
-        *b++ = ')';
-    }
-    *b = 0;
-}
+/* SELECT: the CHORD SET, what the black keys play. "As set" is each button's own chord (the Chords page);
+ * the others put one chord type on every button, the roots round the circle of fifths as on the Q Chord's
+ * rows (Ab Eb Bb F C G D A E B F#) */
+#define NSETS 10
+static const char *const SET_NAME[NSETS] = {"As set", "Major", "Minor", "7th", "Major 7", "Minor 7",
+                                            "Augmented", "Diminished", "Blues", "Minor blues"};
+static const char *const SET_TAG[NSETS] = {"", "MAJ", "MIN", "7", "M7", "m7", "AUG", "DIM", "BLUES", "mBLUES"};
+static const uint8_t SET_TYPE[NSETS] = {0, CH_MAJ, CH_MIN, CH_7, CH_MAJ7, CH_M7, CH_AUG, CH_DIM, CH_7S9, CH_M6};
+static const uint8_t FIFTHS[NPADS] = {8, 3, 10, 5, 0, 7, 2, 9, 4, 11, 6};
+static int pad_root(int p) { return proj.chordset ? FIFTHS[p] : proj.pad_root[p]; }
+static int pad_type(int p) { return proj.chordset ? SET_TYPE[proj.chordset] : proj.pad_type[p]; }
 
 /* ------------------------------------------------------------ values --- */
 static int knob_get(int k)
@@ -244,6 +242,7 @@ static void knob_set(int k, int v)
         proj.par[k] = (int16_t)v;
         om_set(k, v);
     } else if (k == K_PADROOT || k == K_PADTYPE) {
+        proj.chordset = 0;                       /* a button's own chord: the set is "As set" again */
         if (k == K_PADROOT)
             proj.pad_root[ui.pad_sel] = (uint8_t)v;
         else
@@ -292,7 +291,7 @@ static void sound_chord(void) { om_chord(ui.root, ui.type); }
 static void pad_down(int p)
 {
     uint32_t b = ui.btn;
-    int type = proj.pad_type[p];
+    int type = pad_type(p);
     int mods = (b >> B_ENV & 1u) | (b >> B_LFO & 1u) << 1;
     if (mods)                                    /* the OM's rows: minor, 7th, both: m7 */
         type = mods == 1 ? CH_MIN : mods == 2 ? CH_7 : CH_M7;
@@ -302,7 +301,7 @@ static void pad_down(int p)
         ui.btn_used |= 1u << B_LFO;
     if (ui.view == V_PADS)
         ui.pad_sel = (uint8_t)p;
-    if (proj.hold && ui.pad == p && !ui.npads_down && ui.root == proj.pad_root[p] && ui.type == type) {
+    if (proj.hold && ui.pad == p && !ui.npads_down && ui.root == pad_root(p) && ui.type == type) {
         ui.pad = -1;                             /* HOLD: the sounding button again lets it go */
         om_gate(0);
         ui.npads_down++;
@@ -310,7 +309,7 @@ static void pad_down(int p)
     }
     ui.npads_down++;
     ui.pad = (int8_t)p;
-    ui.root = proj.pad_root[p];
+    ui.root = (uint8_t)pad_root(p);
     ui.type = (uint8_t)type;
     sound_chord();
     om_gate(1);
@@ -566,13 +565,20 @@ static void input(void)
     if (btn || keys || ch)
         ui.act_t = plat_ms();
     midi_in();
-    if ((e = plat_enc(EN_SELECT)) != 0) {        /* the key: the whole instrument, -6..+6 */
-        char t[12];
-        int tr;
-        knob_set(P_TRANSPOSE, proj.par[P_TRANSPOSE] + (e > 0 ? 1 : -1));
-        tr = proj.par[P_TRANSPOSE];
-        key_text(tr, t);
-        say("KEY", t);
+    if ((e = plat_enc(EN_SELECT)) != 0) {        /* the chord set: what the black keys play */
+        int cs = (int)proj.chordset + (e > 0 ? 1 : -1);
+        cs = cs < 0 ? 0 : cs >= NSETS ? NSETS - 1 : cs;
+        if (cs != proj.chordset) {
+            proj.chordset = (uint8_t)cs;
+            mark_dirty();
+            if (ui.pad >= 0) {                   /* a button held: it plays the new set now */
+                ui.root = (uint8_t)pad_root(ui.pad);
+                ui.type = (uint8_t)pad_type(ui.pad);
+                sound_chord();
+            }
+        }
+        say("CHORDS", SET_NAME[proj.chordset]);
+        ui.act_t = plat_ms();
     }
     if ((e = plat_enc(EN_ALGO)) != 0)
         knob_set(P_RHYTHM, proj.par[P_RHYTHM] + (e > 0 ? 1 : -1));
@@ -638,7 +644,8 @@ static void draw_header(void)
     int msg = plat_ms() < ui.msg_until;
     int ez = proj.par[P_EZ] && !om_playing;
     uint32_t h = hash(hash(hash(2166136261u, ui.view), om_playing | ui.armed << 1 | proj.hold << 2 | proj.sync << 3 |
-                                                       ui.dirty << 4 | (uint32_t)msg << 5 | (uint32_t)ez << 6),
+                                                       ui.dirty << 4 | (uint32_t)msg << 5 | (uint32_t)ez << 6 |
+                                                       (uint32_t)proj.chordset << 8),
                       (uint32_t)proj.par[P_RHYTHM] << 8 | (uint32_t)proj.par[P_TEMPO] | (uint32_t)om_ext << 20);
     if (msg)
         h = hash(hash(h, (uint32_t)ui.msg[0][0] << 8 | ui.msg[0][1]), ui.msg_until);
@@ -689,6 +696,13 @@ static void draw_header(void)
             int32_t w = text_w(&FONT_XS, "HOLD") + 10;
             cv_round(x, 6, w, 16, 6, K_CHORD_T);
             cv_text(x + 5, 7, &FONT_XS, "HOLD", K_CHORD);
+            x += w + 4;
+        }
+        if (proj.chordset) {                      /* the chord set SELECT chose */
+            const char *s = SET_TAG[proj.chordset];
+            int32_t w = text_w(&FONT_XS, s) + 10;
+            cv_round(x, 6, w, 16, 6, K_CHORD);
+            cv_text(x + 5, 7, &FONT_XS, s, K_WHITE);
             x += w + 4;
         }
         if (proj.sync) {
@@ -762,9 +776,9 @@ static void draw_pads(int32_t y0)
         if (sel)
             cv_round(x - 1, y0 - 1, 20, 30, 6, K_TEXT);
         cv_round(x, y0, 18, 28, 5, on ? K_CHORD : K_CHORD_T);
-        chord_name(proj.pad_root[p], 0, t);
+        chord_name(pad_root(p), 0, t);
         text_c(x + 9, y0 + 1, &FONT_XS, t, on ? K_WHITE : K_TEXT);
-        text_c(x + 9, y0 + 13, &FONT_XS, proj.pad_type[p] ? OM_TYPE_NAME[proj.pad_type[p]] : "", on ? K_WHITE : K_CHORD);
+        text_c(x + 9, y0 + 13, &FONT_XS, pad_type(p) ? OM_TYPE_NAME[pad_type(p)] : "", on ? K_WHITE : K_CHORD);
     }
 }
 
@@ -777,7 +791,7 @@ static void draw_main(void)
     h = hash(hash(h, (uint32_t)ui.pad | ui.pad_sel << 8 | ui.root << 16 | ui.type << 24),
              (uint32_t)proj.par[P_TRANSPOSE] << 8 | (uint32_t)(om_chord_level * 8.0f));
     for (s = 0; s < NPADS; s++)
-        h = hash(h, proj.pad_root[s] | proj.pad_type[s] << 4);
+        h = hash(h, (uint32_t)pad_root((int)s) | (uint32_t)pad_type((int)s) << 4);
     h = hash(hash(h, (uint32_t)proj.par[P_AUTOCH] | (uint32_t)proj.par[P_PLUS] << 1 | (uint32_t)proj.par[P_VIB] << 2 |
                          (uint32_t)proj.par[P_REVON] << 3),
              (uint32_t)(ui.bend + 100));
@@ -958,7 +972,7 @@ static char sp_buf[ANN_MAX + 1] OM_POOL;
 static uint32_t sp_n;
 /* the chord types in words: the screen's "m" and "M7" differ only in capitals, which the words file ignores */
 static const char *const TYPE_SAID[CH_NTYPES] = {"major", "minor", "7", "major 7", "minor 7", "diminished",
-                                                 "augmented", "suspended 4", "add 9"};
+                                                 "augmented", "suspended 4", "add 9", "7 sharp 9", "minor 6"};
 
 static void sp_cat(const char *s)
 {
@@ -1021,6 +1035,10 @@ static void sp_screen(int all)
     sp_cat(om_playing ? ", playing" : ui.armed ? ", waiting for a chord" : ", stopped");
     if (proj.par[P_EZ])
         sp_cat(". EZ Play on");
+    if (proj.chordset) {
+        sp_cat(". Chords ");
+        sp_cat(SET_NAME[proj.chordset]);
+    }
     sp_cat(proj.par[P_AUTOCH] ? ". Auto chord on" : ". Auto chord off");
     if (proj.par[P_PLUS])
         sp_cat(". Chord plus on");
@@ -1182,8 +1200,12 @@ void ui_init(void)
     memset(&ui, 0, sizeof ui);
     ui.pad = -1;
     ui.touched = -1;
-    ui.root = proj.pad_root[1];                  /* C, the second button */
+    ui.root = proj.pad_root[1];                  /* C, the second button (as set) */
     ui.type = proj.pad_type[1];
+    if (proj.chordset) {                         /* C in the chosen set */
+        ui.root = 0;
+        ui.type = SET_TYPE[proj.chordset];
+    }
     sound_chord();
     lcd_fill(0, 0, 240, 240, K_BG);
 }

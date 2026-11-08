@@ -21,11 +21,11 @@
 
 #include "om_voices.h"
 
-const char *const OM_TYPE_NAME[CH_NTYPES] = {"", "m", "7", "M7", "m7", "dim", "aug", "sus4", "add9"};
+const char *const OM_TYPE_NAME[CH_NTYPES] = {"", "m", "7", "M7", "m7", "dim", "aug", "sus4", "add9", "7#9", "m6"};
 const char *const OM_NOTE_NAME[12] = {"C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
 /* the three tones (semitones over the root); the third tone of a 7th is the 7th, as on the OM */
 const int8_t OM_TYPE_TONES[CH_NTYPES][3] = {
-    {0, 4, 7}, {0, 3, 7}, {0, 4, 10}, {0, 4, 11}, {0, 3, 10}, {0, 3, 6}, {0, 4, 8}, {0, 5, 7}, {0, 4, 2}};
+    {0, 4, 7}, {0, 3, 7}, {0, 4, 10}, {0, 4, 11}, {0, 3, 10}, {0, 3, 6}, {0, 4, 8}, {0, 5, 7}, {0, 4, 2}, {0, 4, 15}, {0, 3, 9}};
 
 static const om_param_t PARAMS[P_NPARAMS] = {
     {"Strum", 0, OM_NINST - 1, 0}, {"Chord", 0, OM_NINST - 1, 0}, {"Plus", 0, OM_NINST - 1, 2}, {"Sustain", 0, 100, 50},
@@ -159,6 +159,7 @@ static int gate;
 
 /* the voices' rates, per sample (from om_voices.h, at om_init) */
 static float i_idk[OM_NINST], i_ar[OM_NINST], i_sdk[OM_NINST], i_cdk[OM_NINST], i_rk[OM_NINST];
+static float vow_f[VOW_N][3];                  /* the formants' state-variable coefficients, 2 sin(pi f / SR) */
 
 /* the LFO (vibrato, tremolo) and the bend: once a chunk */
 #define LFO_HZ 5.5f
@@ -206,7 +207,7 @@ static void midi(uint32_t st, uint32_t d1, uint32_t d2)
 
 /* ---- harp strings */
 typedef struct {
-    float pos, inc, mpos, v, g, y1, y2, k, c, m, modamt, idec, vg, pos2, sw, hold;
+    float pos, inc, mpos, v, g, y1, y2, k, c, m, modamt, idec, vg, pos2, sw, hold, flo[3], fbp[3];
     uint16_t shim_off;
     uint8_t on, note, inst, atk;
 } str_t;
@@ -223,9 +224,12 @@ static void strum(int s)
         midi(0x80, v->note, 0);
     midi(0x90, (uint32_t)n, 100);
     if (!v->on) {
+        int k;
         v->y1 = v->y2 = 0.0f;
         v->g = 0.0f;
         v->v = 0.0f;
+        for (k = 0; k < 3; k++)
+            v->flo[k] = v->fbp[k] = 0.0f;
     }
     v->on = 1;
     v->note = (uint8_t)n;
@@ -257,7 +261,7 @@ static void strum(int s)
 /* ---- chord, chord plus: voices of om_voices.h with a gate */
 enum { A_OFF, A_ATK, A_DEC, A_REL, A_CUT };
 typedef struct {
-    float pos, inc, mpos, v, g, y, idec, pos2, sw, hold;
+    float pos, inc, mpos, v, g, y, idec, pos2, sw, hold, flo[3], fbp[3];
     uint8_t st, base, note, os, ch;             /* os: 0 held, 1 a stab (released at once), 2 rings out */
 } av_t;
 #define OM_NPLUS 4
@@ -277,7 +281,10 @@ static void av_trigger(av_t *v, int base, int ii, int os)
     if (v->st != A_OFF)
         midi(0x80u | v->ch, v->note, 0);
     if (v->st == A_OFF) {
+        int k;
         v->v = v->g = v->y = 0.0f;
+        for (k = 0; k < 3; k++)
+            v->flo[k] = v->fbp[k] = 0.0f;
     }
     av_note(v, base, ii);
     v->idec = 1.0f;
@@ -689,7 +696,10 @@ static void quiet(void)
 
 static void inst_init(void)
 {
-    int i;
+    int i, k;
+    for (i = 0; i < VOW_N; i++)
+        for (k = 0; k < 3; k++)
+            vow_f[i][k] = 2.0f * fm_sinf(FM_PI * VOW_HZ[i][k] / OM_SR);
     for (i = 0; i < OM_NINST; i++) {
         const om_inst_t *in = &INST[i];
         i_idk[i] = fm_expf(-16.0f / (OM_SR * fm_maxf(in->itime, 0.001f)));   /* a tick is 16 samples */
@@ -874,6 +884,22 @@ static void render_classic(str_t *v, int s, uint32_t n, float inc, float g1, flo
     v->m = m;
 }
 
+/* a singing voice: the source through the vowel's three formants (state-variable bandpasses, each scaled
+ * to unity at its peak) */
+static inline float formant(float x, float *lo, float *bp, int vw)
+{
+    float o = 0.0f;
+    int k;
+    for (k = 0; k < 3; k++) {
+        float hp;
+        lo[k] += vow_f[vw][k] * bp[k];
+        hp = x - lo[k] - VOW_Q[k] * bp[k];
+        bp[k] += vow_f[vw][k] * hp;
+        o += VOW_G[vw][k] * VOW_Q[k] * bp[k];
+    }
+    return o;
+}
+
 /* a voice's oscillator, one sample: the carrier (phase-modulated while I > 0), its second layer (W2), and
  * the sample-and-hold (crush) */
 static inline float osc(const om_inst_t *in, const float *W, const float *W2, float pos, float *mpos, float *pos2,
@@ -942,6 +968,8 @@ static void render_voice(str_t *v, int s, uint32_t n, float inc, float gain)
             idec *= idk;
         }
         x = osc(in, W, W2, pos, &mpos, &pos2, &hold, j, inc2, minc, I);
+        if (in->vowel)
+            x = formant(x, v->flo, v->fbp, in->vowel);
         y += c * (x - y);
         g += 0.05f * (e - g);
         o = y * g;
@@ -971,6 +999,13 @@ static void render_voice(str_t *v, int s, uint32_t n, float inc, float gain)
     v->mpos = mpos;
     v->pos2 = pos2;
     v->hold = hold;
+    {
+        int k;
+        for (k = 0; k < 3; k++) {
+            v->flo[k] = fm_flush(v->flo[k]);
+            v->fbp[k] = fm_flush(v->fbp[k]);
+        }
+    }
     v->y1 = fm_flush(y);
     v->v = e;
     v->g = g;
@@ -1058,6 +1093,8 @@ static float render_av(av_t *v, int ii, uint32_t n, float gain, float sendg)
             }
         }
         x = osc(in, W, W2, pos, &mpos, &pos2, &hold, j, inc2, minc, I);
+        if (in->vowel)
+            x = formant(x, v->flo, v->fbp, in->vowel);
         y += c * (x - y);
         g += 0.05f * (e - g);
         o = y * g * gt;
@@ -1070,6 +1107,13 @@ static float render_av(av_t *v, int ii, uint32_t n, float gain, float sendg)
     v->mpos = mpos;
     v->pos2 = pos2;
     v->hold = hold;
+    {
+        int k;
+        for (k = 0; k < 3; k++) {
+            v->flo[k] = fm_flush(v->flo[k]);
+            v->fbp[k] = fm_flush(v->fbp[k]);
+        }
+    }
     v->y = fm_flush(y);
     v->v = e;
     v->g = g;

@@ -63,16 +63,28 @@ shot bend.png
 wait 400
 expect bend 0
 key b1 up
-# PRESETS: the sustain; SELECT: the key
+# PRESETS: the sustain; SELECT: the chord set (all minor: C minor on the 5th black key, the circle of fifths)
 spin PRESET -50
 expect par3 0
 spin PRESET 50
 expect par3 50
 turn SELECT 2 200
-expect par15 2
-shot key.png
-turn SELECT -2 200
-expect par15 0
+expect chordset 2
+key b4 down
+wait 50
+expect root 0
+expect type 1
+shot chordset.png
+key b4 up
+turn SELECT 6 100
+expect chordset 8
+key b0 down
+wait 50
+expect root 8
+expect type 9
+key b0 up
+turn SELECT -9 100
+expect chordset 0
 # KNOB 4 on another page is that page's own (Mix: Bass vol)
 tap EDIT
 spin K4 -10

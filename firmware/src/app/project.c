@@ -35,7 +35,7 @@ static int project_valid(void)
             return 0;
     }
     for (i = 0; i < NPADS; i++)
-        if (proj.pad_root[i] > 11u || proj.pad_type[i] >= CH_NTYPES)
+        if (proj.pad_root[i] > 11u || proj.pad_type[i] >= CH_NTYPES || proj.chordset >= 10u)
             return 0;
     return 1;
 }

@@ -23,10 +23,10 @@ said Tune +3
 # the encoders
 turn SELECT 2 200
 wait 300
-said KEY D (+2)
+said CHORDS Minor
 turn SELECT -2 200
 wait 300
-said KEY C
+said CHORDS As set
 turn PRESET 1
 wait 300
 said SUSTAIN 51

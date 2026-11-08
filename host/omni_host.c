@@ -422,6 +422,8 @@ static int expect(const char *what, const char *val)
         got = (int)(om_chord_level * 100.0f);
     else if (!strcmp(what, "bass_level"))
         got = (int)(om_bass_level * 100.0f);
+    else if (!strcmp(what, "chordset"))           /* SELECT's chord set */
+        got = proj.chordset;
     else if (!strcmp(what, "bend"))               /* the pitch bend (PRESETS), -100..100 */
         got = ui.bend;
     else if (!strncmp(what, "par", 3))            /* parN: parameter N (omni.h P_*) */

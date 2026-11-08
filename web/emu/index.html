@@ -143,7 +143,7 @@ kbd { font: 600 .85em ui-monospace, Menlo, monospace; background: var(--card); b
       <li><b>SEQ</b> Auto Chord, <b>SEL</b> Chord Plus, <b>FX</b> Reverb, <b>GLO</b> Vibrato: each on / off.</li>
       <li><b>OCT−</b> / <b>OCT+</b> move the strings an octave.</li>
       <li>Pages: <b>HOME</b> play (the voices and sustain); <b>EDIT</b> steps through Play, Mix, Rhythm, Sound, Chords (press a black key, then turn KNOB 1 and 2 to change it) and Setup.</li>
-      <li><b>SELECT</b> key, <b>ALGORITHM</b> rhythm, <b>PRESETS</b> sustain, <b>KNOB 1–4</b> the values on the screen (on the Play page <b>KNOB 4</b> is the pitch bend: it springs back). <b>SAVE</b> saves.</li>
+      <li><b>SELECT</b> chord set (as set, or all major, minor, 7th, M7, m7, aug, dim, blues), <b>ALGORITHM</b> rhythm, <b>PRESETS</b> sustain, <b>KNOB 1–4</b> the values on the screen (on the Play page <b>KNOB 4</b> is the pitch bend: it springs back). <b>SAVE</b> saves.</li>
     </ul>
   </div>
   <div>
@@ -284,7 +284,7 @@ function hit(c, parent, attrs, cls) {
 const TIP = { FX: "Reverb on and off", SEL: "Chord Plus on and off", ENV: "Hold for a minor chord",
   LFO: "Hold for a 7th chord (with ENV: m7)", EDIT: "Next page", GLO: "Vibrato on and off", HOME: "Play page", SAVE: "Save",
   ARP: "Chord hold", SEQ: "Auto Chord on and off", PLAY: "Rhythm on and off (leaves EZ Play)", REC: "EZ Play on and off",
-  "OCT-": "Strings an octave down", "OCT+": "Strings an octave up", SELECT: "Key", ALGORITHM: "Rhythm", PRESETS: "Sustain",
+  "OCT-": "Strings an octave down", "OCT+": "Strings an octave up", SELECT: "Chord set: what the black keys play", ALGORITHM: "Rhythm", PRESETS: "Sustain",
   KNOB1: "The first value on the screen", KNOB2: "The second value on the screen", KNOB3: "The third value on the screen",
   KNOB4: "The fourth value on the screen" };
 const gKnobs = group("Knobs"), gButtons = group("Buttons"), gChords = group("Chord keys (black)"), gStrum = group("Strum keys (white)");

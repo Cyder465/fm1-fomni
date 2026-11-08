@@ -20,7 +20,7 @@ firmware back, and an FM-1 that keeps crashing starts in a safe mode.
 
 ## Playing
 
-This version adds the Suzuki Q Chord's way of playing: EZ Play, Auto Chord and Chord Plus, a choice of 68 voices
+This version adds the Suzuki Q Chord's way of playing: EZ Play, Auto Chord and Chord Plus, a choice of 70 voices
 for the strum plate, the chord and the chord plus, Vibrato and Reverb buttons, three level controls, and a pitch
 bend for the strum plate.
 
@@ -36,7 +36,7 @@ bend for the strum plate.
 | PLAY | Starts and stops the rhythm. Pressing it in EZ Play turns EZ Play off first. Turning EZ Play on stops the rhythm. |
 | ARP | Turns on CHORD HOLD, so the chord keeps playing after you let go. Press the same chord button again to stop it. |
 | OCT− / OCT+ | Move the strum plate down or up an octave. |
-| SELECT | Changes the **key** (transposes everything, −6 to +6); the screen shows the new key. Tempo is on the Rhythm page. |
+| SELECT | Picks the **CHORD SET**, what the black keys play: **As set** (each button's own chord, from the Chords page), or one type on every button: **Major, Minor, 7th, Major 7, Minor 7, Augmented, Diminished, Blues** (7#9) or **Minor blues** (m6). In a set, the roots go round the circle of fifths like a Q Chord row: Ab Eb Bb F C G D A E B F#. The strum plate follows whatever you press. A tag in the header shows the set. ENV and LFO still work on top. The key (transpose) is on the Chords page; tempo is on the Rhythm page. |
 | ALGORITHM | Picks the rhythm. |
 | PRESETS | **SUSTAIN** of the strum plate, from any page. At 0 every voice (even violin or organ) stops in about a quarter second. |
 | HOME / EDIT | HOME goes to the Play page. EDIT steps through the pages. |
@@ -64,7 +64,7 @@ organ on the chord), and **Omni 2** is its plain harp. The others: Piano, E.Pian
 Glocken, Music Box, Vibes, Marimba, Xylophone, Bells, Kalimba, SteelDrum, Organ, PercOrgan, RockOrgan, Church,
 Accordion, Harmonica, Nylon Gtr, Steel Gtr, Jazz Gtr, Mute Gtr, Dist Gtr, Banjo, Sitar, Dulcimer, Harp, Pizzicato,
 Bass, SynthBass, Violin, Cello, Strings, SynString, Choir, Trumpet, Brass, Sax, Clarinet, Oboe, Flute, Pan Flute,
-Ocarina, Calliope, Sq Lead, Saw Lead, PolySynth, Warm Pad, Halo Pad, Metal Pad; more synths: Supersaw, Sync Lead, PWM Pad, PluckSyn, SynBrass, Acid Bass, Sub Bass, Chiptune; layered, many-voice sounds: Ensemble, ChoirEns, 12-String, OctaveGtr, Fifths; and two experimental ones, Laser Zap (each pluck dives two octaves) and Glitch (a crushed, warbling FM tone). They're small synth patches
+Ocarina, Calliope, Sq Lead, Saw Lead, PolySynth, Warm Pad, Halo Pad, Metal Pad; more synths: Supersaw, Sync Lead, PWM Pad, PluckSyn, SynBrass, Acid Bass, Sub Bass, Chiptune; layered, many-voice sounds: Ensemble, ChoirEns, 12-String, OctaveGtr, Fifths; two singing voices, Singer (a sung "aah", with vibrato) and Chant (a low "ooh"), made with vowel formants; and two experimental ones, Laser Zap (each pluck dives two octaves) and Glitch (a crushed, warbling FM tone). They're small synth patches
 (wavetable and two-operator FM; `firmware/src/dsp/om_voices.h`), levelled to match the Omni harp. Every voice
 fades with Sustain. Held voices like organ, strings and winds fade slowly on the strum plate and hold on the chord.
 

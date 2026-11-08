@@ -23,8 +23,9 @@
 #define OM_NCHORD 3                    /* the OM's chords are triads */
 
 /* chord types: the OM-108's nine (all triads: a 7th drops its fifth, as on the Omnichord) */
-enum { CH_MAJ, CH_MIN, CH_7, CH_MAJ7, CH_M7, CH_DIM, CH_AUG, CH_SUS4, CH_ADD9, CH_NTYPES };
-extern const char *const OM_TYPE_NAME[CH_NTYPES];      /* "", "m", "7", "M7", "m7", "dim", "aug", "sus4", "add9" */
+/* and two blues chords, as triads too: 7#9 (root, 3rd and the blue minor 3rd above, the 7th left out) and m6 */
+enum { CH_MAJ, CH_MIN, CH_7, CH_MAJ7, CH_M7, CH_DIM, CH_AUG, CH_SUS4, CH_ADD9, CH_7S9, CH_M6, CH_NTYPES };
+extern const char *const OM_TYPE_NAME[CH_NTYPES];      /* "", "m", "7", "M7", "m7", "dim", "aug", "sus4", "add9", "7#9", "m6" */
 extern const char *const OM_NOTE_NAME[12];             /* "C", "C#"... */
 extern const int8_t OM_TYPE_TONES[CH_NTYPES][3];
 
