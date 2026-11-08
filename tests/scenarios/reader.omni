@@ -56,22 +56,22 @@ tap SEL
 said AUTO CHORD OFF
 tap SEL
 said AUTO CHORD ON
-tap ENV
+tap FX
 said CHORD PLUS ON
-tap ENV
+tap FX
 said CHORD PLUS OFF
-tap LFO
+tap GLO
 wait 300
 said Sustain page: Strum sus 51, Chord sus 30, Plus sus 40
-tap LFO
+tap GLO
 wait 300
-tap FX
+tap LFO
 said REVERB OFF
-tap FX
+tap LFO
 said REVERB ON
-tap GLO
+tap ENV
 said VIBRATO ON
-tap GLO
+tap ENV
 said VIBRATO OFF
 tap ARP
 said CHORD HOLD ON

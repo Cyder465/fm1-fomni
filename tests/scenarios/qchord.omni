@@ -10,12 +10,12 @@ expect bass_level 0
 strum 0 15 25
 wait 300
 shot ez.png
-# CHORD PLUS (ENV) by hand: the bass comes in, with the chord an octave up
-tap ENV
+# CHORD PLUS (FX) by hand: the bass comes in, with the chord an octave up
+tap FX
 expect par24 1
 wait 100
 expect bass_level >50
-tap ENV
+tap FX
 expect par24 0
 wait 600
 expect bass_level 0
@@ -33,12 +33,12 @@ strum 0 15 25
 key b4 up
 tap SEL
 expect par23 1
-# REVERB (FX) and VIBRATO (GLO)
-tap FX
+# REVERB (LFO) and VIBRATO (ENV)
+tap LFO
 expect par26 0
-tap FX
+tap LFO
 expect par26 1
-tap GLO
+tap ENV
 expect par25 1
 shot toggles.png
 leds
@@ -95,7 +95,7 @@ wait 1000
 # EZ PLAY off, the rhythm with CHORD PLUS's figure
 tap REC
 expect par22 0
-tap ENV
+tap FX
 key b1 down
 tap PLAY
 expect playing 1
@@ -114,8 +114,8 @@ wait 500
 wavstop
 expect peak_db_max -0.1
 expect peak_db_min -30
-# LFO: the Sustain page. A key held down rings on whatever the sustain; let go, the sustain is its fade
-tap LFO
+# GLO: the Sustain page. A key held down rings on whatever the sustain; let go, the sustain is its fade
+tap GLO
 expect view 6
 spin K1 -50
 expect par3 0
@@ -141,5 +141,5 @@ key b1 up
 wait 300
 expect chord_level 0
 shot sustainpage.png
-tap LFO
+tap GLO
 expect view 0

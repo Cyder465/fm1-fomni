@@ -5,11 +5,12 @@
  *   white keys     the strum plate: each one plucks a string of the chord
  *   black keys     the chord buttons (SELECT: the chord set)
  *   REC            EZ PLAY: no rhythm, just the chord buttons and the strum plate
+ *   FX             CHORD PLUS: with the rhythm, a figure of its own; by hand, the chord an octave up + bass
  *   SEL            AUTO CHORD: the chord section on / off (off, the buttons only change the strum plate)
- *   ENV            CHORD PLUS: with the rhythm, a figure of its own; by hand, the chord an octave up + bass
- *   LFO            the Sustain page: the strum plate's, the chord's and the chord plus's sustain
+ *   ENV            VIBRATO on / off (the strum plate)        LFO   REVERB on / off
+ *                  (FX SEL ENV LFO: the screen's PLUS AUTO VIB REV tags, left to right)
+ *   GLO            the Sustain page: the strum plate's, the chord's and the chord plus's sustain
  *   a key held down (white or black) rings on, whatever the sustain; the sustain is its fade once let go
- *   FX             REVERB on / off          GLO   VIBRATO on / off (the strum plate)
  *   PLAY           the rhythm on / off (it leaves EZ PLAY; with SYNC START it waits for the first chord)
  *   ARP            CHORD HOLD          OCT- / OCT+   the plate's octave
  *   HOME           the Play page       EDIT   the next page (Play, Mix, Rhythm, Sound, Chords, Setup)
@@ -34,7 +35,8 @@ static const uint8_t VIEW_KNOB[NVIEWS][4] = {
     {P_SUSTAIN, P_CSUS, P_PSUS, K_NONE},
 };
 /* the buttons that turn a part on and off, and the parameter each one flips */
-static const uint8_t TOGGLE_BTN[5] = {B_REC, B_SEL, B_ENV, B_FX, B_GLO};
+/* FX SEL ENV LFO sit under the screen's PLUS AUTO VIB REV tags, in that order */
+static const uint8_t TOGGLE_BTN[5] = {B_REC, B_SEL, B_FX, B_LFO, B_ENV};
 static const uint8_t TOGGLE_PAR[5] = {P_EZ, P_AUTOCH, P_PLUS, P_REVON, P_VIB};
 static const char *const TOGGLE_SAID[5] = {"EZ PLAY", "AUTO CHORD", "CHORD PLUS", "REVERB", "VIBRATO"};
 
@@ -354,7 +356,7 @@ static void button(int b)
         }
     switch (b) {
     case B_HOME: set_view(V_PLAY); break;
-    case B_LFO: set_view(ui.view == V_SUS ? V_PLAY : V_SUS); break;   /* the Sustain page, and back */
+    case B_GLO: set_view(ui.view == V_SUS ? V_PLAY : V_SUS); break;   /* the Sustain page, and back */
     case B_EDIT: set_view((ui.view + 1) % NVIEWS); break;
     case B_PLAY:
         if (proj.par[P_EZ] && !om_playing) {     /* PLAY leaves EZ PLAY: the rhythm comes back */
@@ -839,7 +841,7 @@ static void draw_main(void)
                 }
         }
     }
-    {   /* the parts on and off (ENV, SEL, GLO, FX: PLUS AUTO VIB REV), right to left at the top */
+    {   /* the parts on and off (FX SEL ENV LFO: PLUS AUTO VIB REV), right to left at the top */
         static const char *const TAG[4] = {"REV", "VIB", "AUTO", "PLUS"};
         const int on[4] = {proj.par[P_REVON], proj.par[P_VIB], proj.par[P_AUTOCH], proj.par[P_PLUS]};
         int32_t x = 228, i;
@@ -911,7 +913,7 @@ static void draw_knobs(void)
 static void leds(void)
 {
     uint32_t b = 0, k = 0, i;
-    b |= 1u << (ui.view == V_PLAY ? B_HOME : ui.view == V_SUS ? B_LFO : B_EDIT);
+    b |= 1u << (ui.view == V_PLAY ? B_HOME : ui.view == V_SUS ? B_GLO : B_EDIT);
     if (om_playing)
         b |= (om_step & 3u) < 2u ? 1u << B_PLAY : 0u;
     else if (ui.armed && (ui.frame / 8u) & 1u)
