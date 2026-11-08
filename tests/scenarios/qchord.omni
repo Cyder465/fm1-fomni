@@ -2,7 +2,7 @@
 wav qchord.wav
 wait 200
 # EZ PLAY (REC) is on from the start: a chord button sounds its chord, no bass, no rhythm
-expect par20 1
+expect par22 1
 key b1 down
 wait 100
 expect chord_level >50
@@ -10,18 +10,18 @@ expect bass_level 0
 strum 0 15 25
 wait 300
 shot ez.png
-# CHORD PLUS (SEL) by hand: the bass comes in, with the chord an octave up
-tap SEL
-expect par22 1
+# CHORD PLUS (ENV) by hand: the bass comes in, with the chord an octave up
+tap ENV
+expect par24 1
 wait 100
 expect bass_level >50
-tap SEL
-expect par22 0
+tap ENV
+expect par24 0
 wait 600
 expect bass_level 0
-# AUTO CHORD (SEQ) off: the buttons only change the strum plate
-tap SEQ
-expect par21 0
+# AUTO CHORD (SEL) off: the buttons only change the strum plate
+tap SEL
+expect par23 0
 wait 500
 expect chord_level 0
 key b1 up
@@ -31,15 +31,15 @@ expect root 9
 expect chord_level 0
 strum 0 15 25
 key b4 up
-tap SEQ
-expect par21 1
+tap SEL
+expect par23 1
 # REVERB (FX) and VIBRATO (GLO)
 tap FX
-expect par24 0
+expect par26 0
 tap FX
-expect par24 1
+expect par26 1
 tap GLO
-expect par23 1
+expect par25 1
 shot toggles.png
 leds
 # the voices: the strum plate on Vibes (KNOB 1), the chord on Strings (KNOB 2)
@@ -94,8 +94,8 @@ tap HOME
 wait 1000
 # EZ PLAY off, the rhythm with CHORD PLUS's figure
 tap REC
-expect par20 0
-tap SEL
+expect par22 0
+tap ENV
 key b1 down
 tap PLAY
 expect playing 1
@@ -109,8 +109,37 @@ expect playing 1
 tap REC
 wait 50
 expect playing 0
-expect par20 1
+expect par22 1
 wait 500
 wavstop
 expect peak_db_max -0.1
 expect peak_db_min -30
+# LFO: the Sustain page. A key held down rings on whatever the sustain; let go, the sustain is its fade
+tap LFO
+expect view 6
+spin K1 -50
+expect par3 0
+key w5 down
+wait 2000
+expect strlevel5 >50
+key w5 up
+wait 600
+expect strlevel5 0
+spin K2 70
+expect par20 100
+key b1 down
+wait 2000
+expect chord_level >50
+key b1 up
+wait 1000
+expect chord_level >50
+spin K2 -100
+wait 3000
+key b1 down
+wait 100
+key b1 up
+wait 300
+expect chord_level 0
+shot sustainpage.png
+tap LFO
+expect view 0

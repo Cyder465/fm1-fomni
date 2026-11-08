@@ -28,12 +28,13 @@ const int8_t OM_TYPE_TONES[CH_NTYPES][3] = {
     {0, 4, 7}, {0, 3, 7}, {0, 4, 10}, {0, 4, 11}, {0, 3, 10}, {0, 3, 6}, {0, 4, 8}, {0, 5, 7}, {0, 4, 2}, {0, 4, 15}, {0, 3, 9}};
 
 static const om_param_t PARAMS[P_NPARAMS] = {
-    {"Strum", 0, OM_NINST - 1, 0}, {"Chord", 0, OM_NINST - 1, 0}, {"Plus", 0, OM_NINST - 1, 2}, {"Sustain", 0, 100, 50},
+    {"Strum", 0, OM_NINST - 1, 0}, {"Chord", 0, OM_NINST - 1, 0}, {"Plus", 0, OM_NINST - 1, 2}, {"Strum sus", 0, 100, 50},
     {"Strum vol", 0, 100, 80}, {"Chord vol", 0, 100, 60}, {"Drum vol", 0, 100, 70}, {"Bass vol", 0, 100, 60},
     {"Rhythm", 0, OM_NRHYTHM - 1, 0}, {"Tempo", 60, 240, 116}, {"Bass", 0, 1, 1},
     {"Rev depth", 0, 100, 35}, {"Space", 0, 100, 55}, {"Vib depth", 0, 100, 40}, {"Width", 0, 100, 60},
     {"Transpose", -6, 6, 0}, {"Octave", -1, 1, 0},
     {"Tune", -50, 50, 0}, {"MIDI out", 0, 1, 1}, {"Bend", 1, 12, 2},
+    {"Chord sus", 0, 100, 30}, {"Plus sus", 0, 100, 40},
     {"EZ Play", 0, 1, 1}, {"Auto Chord", 0, 1, 1}, {"Chord Plus", 0, 1, 0}, {"Vibrato", 0, 1, 0}, {"Reverb", 0, 1, 1},
 };
 
@@ -85,7 +86,7 @@ void om_param_text(int i, int v, char *b)
         s = OM_RHYTHM[v < 0 ? 0 : v % OM_NRHYTHM].name;
     else if (i == P_SVOICE || i == P_CVOICE || i == P_PVOICE)
         s = om_inst_name(v);
-    else if (i == P_BASS || i == P_MIDI || i >= P_EZ)
+    else if (i == P_BASS || i == P_MIDI || i >= P_EZ)      /* (the buttons are the last parameters) */
         s = ONOFF[v ? 1 : 0];
     if (s) {
         int k = 0;
@@ -120,7 +121,7 @@ void om_voicing(int root, int type, int transpose, int octave, uint8_t harp[OM_N
 }
 
 /* ------------------------------------------------------------ commands --- */
-enum { C_SET, C_CHORD, C_GATE, C_STRUM, C_PLAY, C_PANIC, C_CLOCK, C_BEND };
+enum { C_SET, C_CHORD, C_GATE, C_STRUM, C_PLAY, C_PANIC, C_CLOCK, C_BEND, C_UNHOLD };
 #define QN 64u
 static uint32_t q[QN];
 static volatile uint32_t q_w, q_r;
@@ -137,6 +138,7 @@ void om_set(int p, int v) { post(C_SET, p, v); }
 void om_chord(int root, int type) { post(C_CHORD, root, type); }
 void om_gate(int on) { post(C_GATE, on, 0); }
 void om_strum(int s) { post(C_STRUM, s, 0); }
+void om_key(int s, int down) { post(down ? C_STRUM : C_UNHOLD, s, down ? 1 : 0); }
 void om_play(int on) { post(C_PLAY, on, 0); }
 void om_panic(void) { post(C_PANIC, 0, 0); }
 void om_clock(int msg) { post(C_CLOCK, msg, 0); }
@@ -152,6 +154,11 @@ volatile uint8_t om_ext;
 
 static int16_t par[P_NPARAMS];
 static float tunefac = 1.0f, svol, cvol, bvol, rvol, rsend, csend, sus_rate, vib_depth;
+/* the Sustain page's chord and plus: their release after the button is let go, per sample (and the plus
+ * figure's ring-out time constant) */
+static float c_rk, p_rk, p_dk;
+static float sus_time(int v) { return 0.05f * fm_powf(120.0f, (float)v * 0.01f); }   /* 0.05 s .. 6 s */
+#define HOLD_LVL 0.6f                          /* a held key or chord button: the level it holds at */
 static float pan_l[OM_NSTR], pan_r[OM_NSTR];
 static int root, type;
 static uint8_t harp_n[OM_NSTR], chord_n[OM_NCHORD], bass_n, plus_n[4];
@@ -209,7 +216,7 @@ static void midi(uint32_t st, uint32_t d1, uint32_t d2)
 typedef struct {
     float pos, inc, mpos, v, g, y1, y2, k, c, m, modamt, idec, vg, pos2, sw, hold, flo[3], fbp[3];
     uint16_t shim_off;
-    uint8_t on, note, inst, atk;
+    uint8_t on, note, inst, atk, held;          /* held: its white key is down */
 } str_t;
 static str_t str[OM_NSTR];
 
@@ -618,6 +625,11 @@ static void apply(int p, int v)
     case P_RHYVOL: rvol = (float)v * 0.01f; break;
     case P_REVERB: case P_REVON: sends_set(); break;
     case P_VIBDEPTH: vib_depth = (float)v * 0.5f; break;    /* up to 50 cents */
+    case P_CSUS: c_rk = 1.0f / (OM_SR * sus_time(v)); break;
+    case P_PSUS:
+        p_rk = 1.0f / (OM_SR * sus_time(v));
+        p_dk = 1.0f / (OM_SR * fm_maxf(sus_time(v), 0.1f));
+        break;
     case P_SPACE:                                 /* the plate's decay: a small room to a long hall */
         pl_decay = 0.35f + 0.55f * (float)v * 0.01f;
         pl_dd2 = fm_clampf(pl_decay + 0.15f, 0.25f, 0.5f);
@@ -803,8 +815,14 @@ static void drain(void)
             }
             break;
         case C_STRUM:
-            if (a < OM_NSTR)
+            if (a < OM_NSTR) {
                 strum(a);
+                str[a].held = (uint8_t)(b != 0);
+            }
+            break;
+        case C_UNHOLD:
+            if (a < OM_NSTR)
+                str[a].held = 0;
             break;
         case C_PLAY:
             if (a && !om_playing)
@@ -865,7 +883,8 @@ static void render_classic(str_t *v, int s, uint32_t n, float inc, float g1, flo
         mixr[j] += o * gr;
         send[j] += o * rsend;
         pos = adv(pos, inc);
-        e -= sr * (0.34f + 8.5f * e * e * e);
+        if (!(v->held && e <= HOLD_LVL))        /* a key held down: it rings on */
+            e -= sr * (0.34f + 8.5f * e * e * e);
         if (e <= 0.0f) {
             e = 0.0f;
             if (g < 1e-4f) {
@@ -984,7 +1003,8 @@ static void render_voice(str_t *v, int s, uint32_t n, float inc, float gain)
                 atk = 0;
             }
         } else {
-            e -= sr * (base + curve * e * e * e);
+            if (!(v->held && e <= HOLD_LVL))    /* a key held down: it rings on */
+                e -= sr * (base + curve * e * e * e);
             if (e <= 0.0f) {
                 e = 0.0f;
                 if (g < 1e-4f) {
@@ -1053,9 +1073,11 @@ static float render_av(av_t *v, int ii, uint32_t n, float gain, float sendg)
     const float inc = v->inc * (1.0f + in->vib * 0.000578f * lfo_val) * sweep_step(in, &v->sw, n),
                 minc = inc * in->ratio, inc2 = inc * in->l2,
                 ar = i_ar[ii], idk = i_idk[ii], gt = gain * in->gain * (1.0f - in->trem * (0.5f + 0.5f * lfo_val)),
-                rk = v->os == 1 ? fm_minf(i_rk[ii], 1.0f / (0.18f * OM_SR)) : i_rk[ii],
-                dk = v->os == 2 ? fm_maxf(i_cdk[ii], 1.0f / (1.0f * OM_SR)) : i_cdk[ii],
-                tgt = v->os ? 0.0f : in->sus, ck = 1.0f / (0.004f * OM_SR);
+                /* let go: the Sustain page's release (a rhythm's stab: short, as the OM's) */
+                rk = v->os == 1 ? fm_minf(i_rk[ii], 1.0f / (0.18f * OM_SR)) : v->ch == 3 ? p_rk : c_rk,
+                dk = v->os == 2 ? p_dk : i_cdk[ii],
+                /* held: it sustains, a plucked voice too (at HOLD_LVL at least) */
+                tgt = v->os ? 0.0f : fm_maxf(in->sus, HOLD_LVL), ck = 1.0f / (0.004f * OM_SR);
     float pos = v->pos, mpos = v->mpos, pos2 = v->pos2, hold = v->hold, y = v->y, e = v->v, g = v->g, c = 1.0f,
           I = 0.0f, idec = v->idec;
     uint32_t j;

@@ -39,29 +39,32 @@ wait 300
 spin K1 9
 wait 300
 said Strum Vibes
-# a chord button: its chord, at once (ENV held: the minor)
+# a chord button: its chord, at once
 key b1 down
 wait 50
 said C major
 key b1 up
-press ENV
 key b2 down
 wait 50
-said G minor
+said G major
 key b2 up
-release ENV
 wait 100
 # the buttons' messages, said once
 tap REC
 said EZ PLAY OFF
-tap SEQ
+tap SEL
 said AUTO CHORD OFF
-tap SEQ
+tap SEL
 said AUTO CHORD ON
-tap SEL
+tap ENV
 said CHORD PLUS ON
-tap SEL
+tap ENV
 said CHORD PLUS OFF
+tap LFO
+wait 300
+said Sustain page: Strum sus 51, Chord sus 30, Plus sus 40
+tap LFO
+wait 300
 tap FX
 said REVERB OFF
 tap FX

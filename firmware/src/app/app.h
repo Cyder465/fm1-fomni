@@ -10,7 +10,7 @@
 #define OM_VERSION "DEV"
 #endif
 #define PROJ_MAGIC 0x494E4D4Fu           /* "OMNI" */
-#define PROJ_FORMAT 3u                   /* 3: the Q Chord parameters (voices, levels, EZ PLAY...); older: defaults */
+#define PROJ_FORMAT 4u                   /* 4: the chord and plus sustain; older: defaults */
 #define NPADS 11                         /* the black keys: chord buttons */
 
 typedef struct {

@@ -38,6 +38,8 @@ enum {
     P_REVERB, P_SPACE, P_VIBDEPTH, P_WIDTH,           /* reverb depth, its size, vibrato depth, stereo width */
     P_TRANSPOSE, P_OCTAVE,                            /* semitones, strum plate octave */
     P_TUNE, P_MIDI, P_BENDRANGE,                      /* cents, MIDI out, the bend's reach (semitones) */
+    P_CSUS, P_PSUS,                                   /* how long the chord and the chord plus ring after they are
+                                                       * let go (the Sustain page; P_SUSTAIN is the strum plate's) */
     P_EZ, P_AUTOCH, P_PLUS, P_VIB, P_REVON,           /* the buttons, on / off: EZ PLAY, AUTO CHORD, CHORD PLUS,
                                                        * VIBRATO, REVERB */
     P_NPARAMS
@@ -69,7 +71,9 @@ void om_init(void);
 void om_set(int param, int value);
 void om_chord(int root, int type);             /* the chord the harp, chord and bass play from now on */
 void om_gate(int on);                          /* a chord pad held (1) / released (0): the chord section */
-void om_strum(int string);                     /* pluck string 0..15 */
+void om_strum(int string);                     /* pluck string 0..15 (and let it ring: MIDI in) */
+void om_key(int string, int down);             /* a white key: down plucks it and holds it (it rings, whatever the
+                                                * sustain, until the key is let go); up lets it fade */
 void om_play(int on);                          /* the rhythm: start (from its first step) / stop */
 void om_panic(void);                           /* everything quiet, now */
 void om_bend(int pos);                         /* the strum plate's pitch bend, -100..100 (of P_BENDRANGE) */

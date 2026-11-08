@@ -27,10 +27,10 @@ bend for the strum plate.
 | | |
 |---|---|
 | White keys | The strum plate. Each key plucks one string of the chord. As on the Omnichord, each group of three keys is root, third and fifth, five groups up, folded into an F#–F window, with one more root on top. |
-| Black keys | The chord buttons, F C G, Dm Am, Em G7 E7, D7 Bb and A7 at first. Hold **ENV** for the minor, **LFO** for the 7th, or both for the m7, like the Omnichord's three rows. |
+| Black keys | The chord buttons, F C G, Dm Am, Em G7 E7, D7 Bb and A7 at first. SELECT changes them all to one chord type (below). A chord button held down keeps its chord sounding. |
 | REC | **EZ PLAY** on or off. It's on at first: no rhythm, just the chord buttons and the strum plate. |
-| SEQ | **AUTO CHORD** on or off: the chord section. With it off (and Chord Plus off), the chord buttons only change the strum plate's notes. |
-| SEL | **CHORD PLUS** on or off. With the rhythm, it adds a figure of its own to each style. Played by hand (EZ Play, or the rhythm stopped), it adds the chord an octave up and the bass. |
+| SEL | **AUTO CHORD** on or off: the chord section. With it off (and Chord Plus off), the chord buttons only change the strum plate's notes. |
+| ENV | **CHORD PLUS** on or off. With the rhythm, it adds a figure of its own to each style. Played by hand (EZ Play, or the rhythm stopped), it adds the chord an octave up and the bass. |
 | FX | **REVERB** on or off (Rev depth and Space on the Sound page). |
 | GLO | **VIBRATO** on or off, on the strum plate (Vib depth on the Sound page). It fades in over a quarter second on each pluck. |
 | PLAY | Starts and stops the rhythm. Pressing it in EZ Play turns EZ Play off first. Turning EZ Play on stops the rhythm. |
@@ -38,18 +38,19 @@ bend for the strum plate.
 | OCT− / OCT+ | Move the strum plate down or up an octave. |
 | SELECT | Picks the **CHORD SET**, what the black keys play: **As set** (each button's own chord, from the Chords page), or one type on every button: **Major, Minor, 7th, Major 7, Minor 7, Augmented, Diminished, Blues** (7#9) or **Minor blues** (m6). In a set, the roots go round the circle of fifths like a Q Chord row: Ab Eb Bb F C G D A E B F#. The strum plate follows whatever you press. A tag in the header shows the set. ENV and LFO still work on top. The key (transpose) is on the Chords page; tempo is on the Rhythm page. |
 | ALGORITHM | Picks the rhythm. |
-| PRESETS | **SUSTAIN** of the strum plate, from any page. At 0 every voice (even violin or organ) stops in about a quarter second. |
+| PRESETS | **SUSTAIN** of the strum plate, from any page. At 0 every voice (even violin or organ) stops in about a quarter second. A white key held down keeps ringing whatever the sustain; the sustain is how it fades once you let go. |
+| LFO | Opens the **Sustain** page (press again to go back): KNOB 1 the strum plate's sustain, KNOB 2 the chord's, KNOB 3 Chord Plus's. For the chord and Chord Plus, sustain is how long they ring after you let go of the chord button (0.05 s to 6 s). |
 | HOME / EDIT | HOME goes to the Play page. EDIT steps through the pages. |
 | KNOB 1–4 | Set the four values on the screen. The pages below list them. On the Play page, **KNOB 4 is the PITCH BEND** on the strum plate: each click bends further (five reach the Bend range on the Setup page, 2 semitones at first) and it springs back when you stop turning. On the other pages KNOB 4 is that page's value. |
 | SAVE | Saves. FoMni also saves by itself a few seconds after a change, once it's quiet. |
 
-The top right of the screen shows which of AUTO, PLUS, VIB and REV are on, and the buttons light up to match.
+The top right of the screen shows which of PLUS, AUTO, VIB and REV are on, and the buttons light up to match.
 
 ### The pages
 
 Each page puts four values on KNOB 1–4. Press EDIT to step through the pages.
 
-- **Play** (HOME) has Strum, the strum plate's voice; Chord, the chord's voice; Plus, Chord Plus's voice; and Bend. Sustain (0.25 s to 12 s) is on PRESETS. The top of the page shows the chord on a keyboard octave: the root in coral, the other notes in teal.
+- **Play** (HOME) has Strum, the strum plate's voice; Chord, the chord's voice; Plus, Chord Plus's voice; and Bend. Sustain (0.25 s to 12 s) is on PRESETS and on the Sustain page (LFO). The top of the page shows the chord on a keyboard octave: the root in coral, the other notes in teal.
 - **Mix** has the three Q Chord levels, Strum vol, Chord vol (the chord and chord plus) and Drum vol, plus Bass vol.
 - **Rhythm** has Rhythm, Tempo, Bass (the bass line on or off) and Sync start (the rhythm waits for your first chord).
 - **Sound** has Rev depth, Space (the plate's size), Vib depth and Width. The drums stay dry.

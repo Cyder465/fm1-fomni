@@ -22,7 +22,7 @@ expect chord_level <5
 # PLAY leaves EZ PLAY and starts the rhythm
 tap PLAY
 expect playing 1
-expect par20 0
+expect par22 0
 key b1 down
 wait 3000
 tap EDIT
@@ -52,6 +52,9 @@ tap EDIT
 expect view 5
 wait 50
 shot setup.png
+tap EDIT
+expect view 6
+shot sustain.png
 tap EDIT
 expect view 0
 tap EDIT

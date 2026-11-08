@@ -3,10 +3,12 @@
  * simulator includes it too.
  *
  *   white keys     the strum plate: each one plucks a string of the chord
- *   black keys     the chord buttons; hold ENV for the minor, LFO for the 7th, both for the m7
+ *   black keys     the chord buttons (SELECT: the chord set)
  *   REC            EZ PLAY: no rhythm, just the chord buttons and the strum plate
- *   SEQ            AUTO CHORD: the chord section on / off (off, the buttons only change the strum plate)
- *   SEL            CHORD PLUS: with the rhythm, a figure of its own; by hand, the chord an octave up + bass
+ *   SEL            AUTO CHORD: the chord section on / off (off, the buttons only change the strum plate)
+ *   ENV            CHORD PLUS: with the rhythm, a figure of its own; by hand, the chord an octave up + bass
+ *   LFO            the Sustain page: the strum plate's, the chord's and the chord plus's sustain
+ *   a key held down (white or black) rings on, whatever the sustain; the sustain is its fade once let go
  *   FX             REVERB on / off          GLO   VIBRATO on / off (the strum plate)
  *   PLAY           the rhythm on / off (it leaves EZ PLAY; with SYNC START it waits for the first chord)
  *   ARP            CHORD HOLD          OCT- / OCT+   the plate's octave
@@ -17,8 +19,8 @@
  *                  turn and it bends, let go and it springs back (on the other pages, their own value)
  *   SAVE           saves (it also saves by itself, a few seconds after a change, when quiet) */
 
-enum { V_PLAY, V_MIX, V_RHYTHM, V_SOUND, V_PADS, V_SETUP, NVIEWS };
-static const char *const VIEW_NAME[NVIEWS] = {"Play", "Mix", "Rhythm", "Sound", "Chords", "Setup"};
+enum { V_PLAY, V_MIX, V_RHYTHM, V_SOUND, V_PADS, V_SETUP, V_SUS, NVIEWS };
+static const char *const VIEW_NAME[NVIEWS] = {"Play", "Mix", "Rhythm", "Sound", "Chords", "Setup", "Sustain"};
 /* the four knobs of each page: a parameter, or one of these (K_BEND: not a value, the bend itself; the
  * screen reader does not watch it) */
 enum { K_PADROOT = 100, K_PADTYPE, K_LEDS, K_SYNC, K_BEND, K_NONE };
@@ -29,9 +31,10 @@ static const uint8_t VIEW_KNOB[NVIEWS][4] = {
     {P_REVERB, P_SPACE, P_VIBDEPTH, P_WIDTH},
     {K_PADROOT, K_PADTYPE, P_TRANSPOSE, P_OCTAVE},
     {P_TUNE, P_MIDI, K_LEDS, P_BENDRANGE},
+    {P_SUSTAIN, P_CSUS, P_PSUS, K_NONE},
 };
 /* the buttons that turn a part on and off, and the parameter each one flips */
-static const uint8_t TOGGLE_BTN[5] = {B_REC, B_SEQ, B_SEL, B_FX, B_GLO};
+static const uint8_t TOGGLE_BTN[5] = {B_REC, B_SEL, B_ENV, B_FX, B_GLO};
 static const uint8_t TOGGLE_PAR[5] = {P_EZ, P_AUTOCH, P_PLUS, P_REVON, P_VIB};
 static const char *const TOGGLE_SAID[5] = {"EZ PLAY", "AUTO CHORD", "CHORD PLUS", "REVERB", "VIBRATO"};
 
@@ -290,15 +293,7 @@ static void sound_chord(void) { om_chord(ui.root, ui.type); }
 
 static void pad_down(int p)
 {
-    uint32_t b = ui.btn;
-    int type = pad_type(p);
-    int mods = (b >> B_ENV & 1u) | (b >> B_LFO & 1u) << 1;
-    if (mods)                                    /* the OM's rows: minor, 7th, both: m7 */
-        type = mods == 1 ? CH_MIN : mods == 2 ? CH_7 : CH_M7;
-    if (mods & 1)
-        ui.btn_used |= 1u << B_ENV;
-    if (mods & 2)
-        ui.btn_used |= 1u << B_LFO;
+    int type = pad_type(p);                      /* (the minor and 7th rows: SELECT's chord sets) */
     if (ui.view == V_PADS)
         ui.pad_sel = (uint8_t)p;
     if (proj.hold && ui.pad == p && !ui.npads_down && ui.root == pad_root(p) && ui.type == type) {
@@ -359,6 +354,7 @@ static void button(int b)
         }
     switch (b) {
     case B_HOME: set_view(V_PLAY); break;
+    case B_LFO: set_view(ui.view == V_SUS ? V_PLAY : V_SUS); break;   /* the Sustain page, and back */
     case B_EDIT: set_view((ui.view + 1) % NVIEWS); break;
     case B_PLAY:
         if (proj.par[P_EZ] && !om_playing) {     /* PLAY leaves EZ PLAY: the rhythm comes back */
@@ -546,15 +542,15 @@ static void input(void)
             ui.btn_used &= ~m;
             if (i == B_PLAY)                   /* transport on the press */
                 button((int)i);
-        } else if (!(ui.btn_used & m) && i != B_PLAY && i != B_ENV && i != B_LFO) {
+        } else if (!(ui.btn_used & m) && i != B_PLAY) {
             button((int)i);
         }
     }
     ch = keys ^ ui.keys;
     ui.keys = keys;
     for (i = 0; i < OM_NSTR; i++)              /* strings first: a strum is the fastest thing here */
-        if ((ch & keys) >> WHITE_K[i] & 1u)
-            om_strum((int)i);
+        if (ch >> WHITE_K[i] & 1u)
+            om_key((int)i, (int)(keys >> WHITE_K[i] & 1u));   /* held: it rings on; let go: it fades */
     for (i = 0; i < NPADS; i++)
         if (ch >> BLACK_K[i] & 1u) {
             if (keys >> BLACK_K[i] & 1u)
@@ -843,9 +839,9 @@ static void draw_main(void)
                 }
         }
     }
-    {   /* the parts on and off (SEQ, SEL, GLO, FX), right to left at the top */
-        static const char *const TAG[4] = {"REV", "VIB", "PLUS", "AUTO"};
-        const int on[4] = {proj.par[P_REVON], proj.par[P_VIB], proj.par[P_PLUS], proj.par[P_AUTOCH]};
+    {   /* the parts on and off (ENV, SEL, GLO, FX: PLUS AUTO VIB REV), right to left at the top */
+        static const char *const TAG[4] = {"REV", "VIB", "AUTO", "PLUS"};
+        const int on[4] = {proj.par[P_REVON], proj.par[P_VIB], proj.par[P_AUTOCH], proj.par[P_PLUS]};
         int32_t x = 228, i;
         for (i = 0; i < 4; i++) {
             int32_t w = text_w(&FONT_XS, TAG[i]) + 8;
@@ -915,7 +911,7 @@ static void draw_knobs(void)
 static void leds(void)
 {
     uint32_t b = 0, k = 0, i;
-    b |= 1u << (ui.view == V_PLAY ? B_HOME : B_EDIT);
+    b |= 1u << (ui.view == V_PLAY ? B_HOME : ui.view == V_SUS ? B_LFO : B_EDIT);
     if (om_playing)
         b |= (om_step & 3u) < 2u ? 1u << B_PLAY : 0u;
     else if (ui.armed && (ui.frame / 8u) & 1u)

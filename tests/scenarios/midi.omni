@@ -39,7 +39,7 @@ expect playing 0
 midi FC 00 00
 # EZ PLAY off (REC). Clock in: start, then ticks drive the steps (6 a step)
 tap REC
-expect par20 0
+expect par22 0
 wait 20
 midi FA 00 00
 wait 20

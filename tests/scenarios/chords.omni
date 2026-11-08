@@ -1,33 +1,21 @@
-# chord buttons, the OM rows (ENV minor, LFO 7th, both m7), CHORD HOLD, SYNC START, saving
+# chord buttons, the chord sets (SELECT), CHORD HOLD, SYNC START, saving
 wait 200
-# F (button 0), then ENV held: F minor; LFO: F7; both: Fm7
+# F (button 0) as set; the 7th set (SELECT 3): F7 on the 4th button (the circle of fifths: Ab Eb Bb F ...)
 tapkey b0
 expect root 5
 expect type 0
-press ENV
-tapkey b0
-release ENV
-expect type 1
-press LFO
-tapkey b0
-release LFO
+turn SELECT 3 100
+expect chordset 3
+tapkey b3
+expect root 5
 expect type 2
-press ENV
-press LFO
-tapkey b0
-release LFO
-release ENV
-expect type 4
-# a modifier used with a chord does not open its page
 expect view 0
 # the strings follow the chord: F7 is F A Eb, F3 A3 Eb3 on strings 0..2 (Eb folded up to F#2..F3)
-tapkey b0
-press LFO
-tapkey b0
-release LFO
 expect strnote0 53
 expect strnote1 45
 expect strnote2 51
+turn SELECT -3 100
+expect chordset 0
 # without HOLD the chord stops when let go
 tapkey b1
 wait 400
@@ -52,7 +40,7 @@ expect view 2
 spin K4 1
 expect sync 1
 tap PLAY
-expect par20 0
+expect par22 0
 expect armed 1
 expect playing 0
 wait 100
@@ -91,5 +79,5 @@ wait 100
 expect padroot10 7
 expect par15 2
 expect sync 1
-expect par20 0
+expect par22 0
 shot after_reboot.png
