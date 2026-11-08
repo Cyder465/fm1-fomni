@@ -190,6 +190,22 @@ int main(void)
             }
         }
         check("every voice on the strum plate: sounds, ends", ok_s);
+        {   /* SUSTAIN 0: every voice, held ones (violin, organ) too, is gone within 0.8 s */
+            int ok0 = 1, b;
+            for (ii = 0; ii < om_ninst(); ii++) {
+                om_init();
+                om_set(P_SVOICE, ii);
+                om_set(P_SUSTAIN, 0);
+                om_strum(6);
+                for (b = 0; b < 44100 * 8 / 10 / 256; b++)
+                    run(1);
+                if (om_str_level[6] != 0.0f) {
+                    printf("  voice %d (%s): still sounding 0.8 s after a pluck at sustain 0\n", ii, om_inst_name(ii));
+                    ok0 = 0;
+                }
+            }
+            check("SUSTAIN 0: every voice ends within 0.8 s", ok0);
+        }
         check("every voice on the chord: sounds, ends when let go", ok_c && finite_ok);
     }
     {   /* the CHORD PLUS figures fit their rhythms */

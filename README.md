@@ -20,7 +20,7 @@ firmware back, and an FM-1 that keeps crashing starts in a safe mode.
 
 ## Playing
 
-This version adds the Suzuki Q Chord's way of playing: EZ Play, Auto Chord and Chord Plus, a choice of 53 voices
+This version adds the Suzuki Q Chord's way of playing: EZ Play, Auto Chord and Chord Plus, a choice of 68 voices
 for the strum plate, the chord and the chord plus, Vibrato and Reverb buttons, three level controls, and a pitch
 bend for the strum plate.
 
@@ -36,11 +36,11 @@ bend for the strum plate.
 | PLAY | Starts and stops the rhythm. Pressing it in EZ Play turns EZ Play off first. Turning EZ Play on stops the rhythm. |
 | ARP | Turns on CHORD HOLD, so the chord keeps playing after you let go. Press the same chord button again to stop it. |
 | OCT− / OCT+ | Move the strum plate down or up an octave. |
-| SELECT | Sets the tempo. |
+| SELECT | Changes the **key** (transposes everything, −6 to +6); the screen shows the new key. Tempo is on the Rhythm page. |
 | ALGORITHM | Picks the rhythm. |
-| PRESETS | **PITCH BEND** on the strum plate. Each click bends further (five clicks reach the Bend range set on the Setup page, 2 semitones at first). When you stop turning, it springs back to pitch. |
+| PRESETS | **SUSTAIN** of the strum plate, from any page. At 0 every voice (even violin or organ) stops in about a quarter second. |
 | HOME / EDIT | HOME goes to the Play page. EDIT steps through the pages. |
-| KNOB 1–4 | Set the four values on the screen. The pages below list them. |
+| KNOB 1–4 | Set the four values on the screen. The pages below list them. On the Play page, **KNOB 4 is the PITCH BEND** on the strum plate: each click bends further (five reach the Bend range on the Setup page, 2 semitones at first) and it springs back when you stop turning. On the other pages KNOB 4 is that page's value. |
 | SAVE | Saves. FoMni also saves by itself a few seconds after a change, once it's quiet. |
 
 The top right of the screen shows which of AUTO, PLUS, VIB and REV are on, and the buttons light up to match.
@@ -49,7 +49,7 @@ The top right of the screen shows which of AUTO, PLUS, VIB and REV are on, and t
 
 Each page puts four values on KNOB 1–4. Press EDIT to step through the pages.
 
-- **Play** (HOME) has Strum, the strum plate's voice; Chord, the chord's voice; Plus, Chord Plus's voice; and Sustain, how long the strum plate rings (0.25 s to 12 s).
+- **Play** (HOME) has Strum, the strum plate's voice; Chord, the chord's voice; Plus, Chord Plus's voice; and Bend. Sustain (0.25 s to 12 s) is on PRESETS. The top of the page shows the chord on a keyboard octave: the root in coral, the other notes in teal.
 - **Mix** has the three Q Chord levels, Strum vol, Chord vol (the chord and chord plus) and Drum vol, plus Bass vol.
 - **Rhythm** has Rhythm, Tempo, Bass (the bass line on or off) and Sync start (the rhythm waits for your first chord).
 - **Sound** has Rev depth, Space (the plate's size), Vib depth and Width. The drums stay dry.
@@ -64,9 +64,11 @@ organ on the chord), and **Omni 2** is its plain harp. The others: Piano, E.Pian
 Glocken, Music Box, Vibes, Marimba, Xylophone, Bells, Kalimba, SteelDrum, Organ, PercOrgan, RockOrgan, Church,
 Accordion, Harmonica, Nylon Gtr, Steel Gtr, Jazz Gtr, Mute Gtr, Dist Gtr, Banjo, Sitar, Dulcimer, Harp, Pizzicato,
 Bass, SynthBass, Violin, Cello, Strings, SynString, Choir, Trumpet, Brass, Sax, Clarinet, Oboe, Flute, Pan Flute,
-Ocarina, Calliope, Sq Lead, Saw Lead, PolySynth, Warm Pad, Halo Pad and Metal Pad. They're small synth patches
-(wavetable and two-operator FM; `firmware/src/dsp/om_voices.h`), levelled to match the Omni harp. Plucked voices
-fade with Sustain. Held voices like organ, strings and winds fade slowly on the strum plate and hold on the chord.
+Ocarina, Calliope, Sq Lead, Saw Lead, PolySynth, Warm Pad, Halo Pad, Metal Pad; more synths: Supersaw, Sync Lead, PWM Pad, PluckSyn, SynBrass, Acid Bass, Sub Bass, Chiptune; layered, many-voice sounds: Ensemble, ChoirEns, 12-String, OctaveGtr, Fifths; and two experimental ones, Laser Zap (each pluck dives two octaves) and Glitch (a crushed, warbling FM tone). They're small synth patches
+(wavetable and two-operator FM; `firmware/src/dsp/om_voices.h`), levelled to match the Omni harp. Every voice
+fades with Sustain. Held voices like organ, strings and winds fade slowly on the strum plate and hold on the chord.
+
+When you change chord while strings are still ringing, they slide to the new chord's notes instead of stopping.
 
 ### How the chord section plays
 

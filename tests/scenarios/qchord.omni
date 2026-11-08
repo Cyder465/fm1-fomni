@@ -54,14 +54,31 @@ wait 200
 expect chord_level >50
 strum 0 15 25
 wait 200
-# the bend (PRESETS): turned, it bends; let go, it comes back
-turn PRESET 3 20
+# the bend (KNOB 4 on the Play page): turned, it bends; let go, it comes back
+expect view 0
+turn K4 3 20
 wait 20
 expect bend >50
 shot bend.png
 wait 400
 expect bend 0
 key b1 up
+# PRESETS: the sustain; SELECT: the key
+spin PRESET -50
+expect par3 0
+spin PRESET 50
+expect par3 50
+turn SELECT 2 200
+expect par15 2
+shot key.png
+turn SELECT -2 200
+expect par15 0
+# KNOB 4 on another page is that page's own (Mix: Bass vol)
+tap EDIT
+spin K4 -10
+expect par7 50
+expect bend 0
+tap HOME
 wait 1000
 # EZ PLAY off, the rhythm with CHORD PLUS's figure
 tap REC

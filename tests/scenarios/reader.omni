@@ -3,7 +3,7 @@
 wait 200
 listen
 wait 100
-said Play page: Strum Omni 1, Chord Omni 1, Plus Piano, Sustain 50. Chord C major. Rhythm Rock 1, tempo 116, stopped. EZ Play on
+said Play page: Strum Omni 1, Chord Omni 1, Plus Piano, Bend 0.0. Chord C major. Rhythm Rock 1, tempo 116, stopped. EZ Play on
 # a page settles before it is said
 tap EDIT
 wait 300
@@ -23,7 +23,13 @@ said Tune +3
 # the encoders
 turn SELECT 2 200
 wait 300
-said Tempo 118
+said KEY D (+2)
+turn SELECT -2 200
+wait 300
+said KEY C
+turn PRESET 1
+wait 300
+said SUSTAIN 51
 turn ALGO 1
 wait 300
 said Rhythm Rock 2

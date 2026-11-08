@@ -11,16 +11,18 @@
  *   PLAY           the rhythm on / off (it leaves EZ PLAY; with SYNC START it waits for the first chord)
  *   ARP            CHORD HOLD          OCT- / OCT+   the plate's octave
  *   HOME           the Play page       EDIT   the next page (Play, Mix, Rhythm, Sound, Chords, Setup)
- *   SELECT tempo   ALGORITHM rhythm    PRESETS the PITCH BEND (the strum plate): turn and it bends, let
- *                  go and it springs back      KNOB 1-4 the page's four values
+ *   SELECT the KEY (transpose)   ALGORITHM rhythm    PRESETS the strum plate's SUSTAIN
+ *   KNOB 1-4       the page's four values; on the Play page KNOB 4 is the PITCH BEND (the strum plate):
+ *                  turn and it bends, let go and it springs back (on the other pages, their own value)
  *   SAVE           saves (it also saves by itself, a few seconds after a change, when quiet) */
 
 enum { V_PLAY, V_MIX, V_RHYTHM, V_SOUND, V_PADS, V_SETUP, NVIEWS };
 static const char *const VIEW_NAME[NVIEWS] = {"Play", "Mix", "Rhythm", "Sound", "Chords", "Setup"};
-/* the four knobs of each page: a parameter, or one of these */
-enum { K_PADROOT = 100, K_PADTYPE, K_LEDS, K_SYNC, K_NONE };
+/* the four knobs of each page: a parameter, or one of these (K_BEND: not a value, the bend itself; the
+ * screen reader does not watch it) */
+enum { K_PADROOT = 100, K_PADTYPE, K_LEDS, K_SYNC, K_BEND, K_NONE };
 static const uint8_t VIEW_KNOB[NVIEWS][4] = {
-    {P_SVOICE, P_CVOICE, P_PVOICE, P_SUSTAIN},
+    {P_SVOICE, P_CVOICE, P_PVOICE, K_BEND},
     {P_SVOL, P_CHORD, P_RHYVOL, P_BASSVOL},
     {P_RHYTHM, P_TEMPO, P_BASS, K_SYNC},
     {P_REVERB, P_SPACE, P_VIBDEPTH, P_WIDTH},
@@ -144,6 +146,21 @@ static void chord_name(int root, int type, char *b)
     *b = 0;
 }
 
+static void key_text(int tr, char *b)          /* the key SELECT sets, as a message: "D (+2)", "C" */
+{
+    const char *n = OM_NOTE_NAME[(tr % 12 + 12) % 12];
+    while (*n)
+        *b++ = *n++;
+    if (tr) {
+        *b++ = ' ';
+        *b++ = '(';
+        *b++ = tr > 0 ? '+' : '-';
+        *b++ = (char)('0' + (tr < 0 ? -tr : tr));
+        *b++ = ')';
+    }
+    *b = 0;
+}
+
 /* ------------------------------------------------------------ values --- */
 static int knob_get(int k)
 {
@@ -157,6 +174,8 @@ static int knob_get(int k)
         return proj.leds;
     if (k == K_SYNC)
         return proj.sync;
+    if (k == K_BEND)
+        return ui.bend;
     return 0;
 }
 static void knob_range(int k, int *lo, int *hi)
@@ -165,15 +184,16 @@ static void knob_range(int k, int *lo, int *hi)
         *lo = om_param_info(k)->lo;
         *hi = om_param_info(k)->hi;
     } else {
-        *lo = 0;
-        *hi = k == K_PADROOT ? 11 : k == K_PADTYPE ? CH_NTYPES - 1 : k == K_LEDS ? 2 : k == K_SYNC ? 1 : 0;
+        *lo = k == K_BEND ? -100 : 0;
+        *hi = k == K_PADROOT ? 11 : k == K_PADTYPE ? CH_NTYPES - 1 : k == K_LEDS ? 2 : k == K_SYNC ? 1 : k == K_BEND ? 100 : 0;
     }
 }
 static const char *knob_name(int k)
 {
     if (k < P_NPARAMS)
         return om_param_info(k)->name;
-    return k == K_PADROOT ? "Root" : k == K_PADTYPE ? "Type" : k == K_LEDS ? "Lights" : k == K_SYNC ? "Sync start" : "";
+    return k == K_PADROOT ? "Root" : k == K_PADTYPE ? "Type" : k == K_LEDS ? "Lights" : k == K_SYNC ? "Sync start" :
+           k == K_BEND ? "Bend" : "";
 }
 static void knob_text(int k, char *b)
 {
@@ -196,6 +216,17 @@ static void knob_text(int k, char *b)
         const char *n = v ? "On" : "Off";
         while ((*b++ = *n++))
             ;
+    } else if (k == K_BEND) {                    /* in semitones, a tenth: "+1.2" */
+        int t = v * proj.par[P_BENDRANGE] / 10, a = t < 0 ? -t : t;
+        *b++ = t < 0 ? '-' : t > 0 ? '+' : ' ';
+        if (!t)
+            b--;
+        itoa_u((uint32_t)(a / 10), b);
+        while (*b)
+            b++;
+        *b++ = '.';
+        *b++ = (char)('0' + a % 10);
+        *b = 0;
     } else {
         b[0] = 0;
     }
@@ -471,16 +502,15 @@ static void midi_in(void)
         kb_update();
 }
 
-/* PITCH BEND on the PRESETS encoder, like the Q Chord's wheel on the strum plate: each detent bends
+/* PITCH BEND on KNOB 4 of the Play page, like the Q Chord's wheel on the strum plate: each detent bends
  * further (5 to the full reach, Setup's Bend semitones), and a moment after the last one it springs
- * back to the pitch */
+ * back to the pitch. e: the detents this frame (0: only the spring) */
 #define BEND_STEP 20
 #define BEND_HOLD_MS 150u                      /* still turning: it stays where it is */
 #define BEND_BACK_MS 120u                      /* then back from full in this long */
-static void bend_input(void)
+static void bend_input(int32_t e)
 {
     uint32_t now = plat_ms();
-    int32_t e = plat_enc(EN_PRESET);
     int b = ui.bend;
     if (e) {
         b += (int)e * BEND_STEP;
@@ -536,18 +566,38 @@ static void input(void)
     if (btn || keys || ch)
         ui.act_t = plat_ms();
     midi_in();
-    if ((e = plat_enc(EN_SELECT)) != 0)
-        turn(EN_SELECT, P_TEMPO, e);
+    if ((e = plat_enc(EN_SELECT)) != 0) {        /* the key: the whole instrument, -6..+6 */
+        char t[12];
+        int tr;
+        knob_set(P_TRANSPOSE, proj.par[P_TRANSPOSE] + (e > 0 ? 1 : -1));
+        tr = proj.par[P_TRANSPOSE];
+        key_text(tr, t);
+        say("KEY", t);
+    }
     if ((e = plat_enc(EN_ALGO)) != 0)
         knob_set(P_RHYTHM, proj.par[P_RHYTHM] + (e > 0 ? 1 : -1));
-    bend_input();
-    for (i = 0; i < 4; i++)
-        if ((e = plat_enc(EN_K1 + (int)i)) != 0) {
-            turn(EN_K1 + (int)i, VIEW_KNOB[ui.view][i], e);
+    if ((e = plat_enc(EN_PRESET)) != 0) {        /* the strum plate's sustain, from any page */
+        char t[8];
+        turn(EN_PRESET, P_SUSTAIN, e);
+        itoa_u((uint32_t)proj.par[P_SUSTAIN], t);
+        say("SUSTAIN", t);
+        ui.act_t = plat_ms();
+    }
+    e = 0;
+    for (i = 0; i < 4; i++) {
+        int32_t d = plat_enc(EN_K1 + (int)i);
+        if (VIEW_KNOB[ui.view][i] == K_BEND) {   /* the bend: its own, and it springs back */
+            e = d;
+        } else if (d) {
+            turn(EN_K1 + (int)i, VIEW_KNOB[ui.view][i], d);
+        }
+        if (d) {
             ui.touched = (int8_t)i;
             ui.touch_until = plat_ms() + 1200u;
             ui.act_t = plat_ms();
         }
+    }
+    bend_input(e);
 }
 
 /* ------------------------------------------------------------- screen --- */
@@ -756,7 +806,28 @@ static void draw_main(void)
                 notes[k++] = *n++;
         }
         notes[k] = 0;
-        cv_text(240 - 12 - text_w(&FONT_S, notes), 20, &FONT_S, notes, K_DIM);
+        cv_text(152 - text_w(&FONT_S, notes), 20, &FONT_S, notes, K_DIM);
+        {   /* a keyboard octave with the chord's notes on it: the root coral, the others teal */
+            static const int8_t WIDX[12] = {0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6};   /* white key, or -1 */
+            static const int8_t BIDX[12] = {-1, 0, -1, 1, -1, -1, 3, -1, 4, -1, 5, -1};  /* the white key it follows */
+            const int x0 = 158, y0 = 19, w = 10, hk = 18;
+            int rpc = ((ui.root + proj.par[P_TRANSPOSE]) % 12 + 12) % 12, pc;
+            uint32_t tones = 0;
+            for (i = 0; i < 3; i++)
+                tones |= 1u << (cn[i] % 12);
+            for (pc = 0; pc < 12; pc++)
+                if (WIDX[pc] >= 0) {
+                    uint16_t f = pc == rpc ? K_HARP : (tones >> pc & 1u) ? K_CHORD : K_WHITE;
+                    cv_rect(x0 + WIDX[pc] * w, y0, w - 1, hk, f);
+                    cv_rect(x0 + WIDX[pc] * w + w - 1, y0, 1, hk, K_LINE);
+                }
+            cv_rect(x0, y0 + hk, 7 * w, 1, K_LINE);
+            for (pc = 0; pc < 12; pc++)
+                if (BIDX[pc] >= 0) {
+                    uint16_t f = pc == rpc ? K_HARP : (tones >> pc & 1u) ? K_CHORD : K_TEXT;
+                    cv_rect(x0 + (BIDX[pc] + 1) * w - 3, y0, 6, 11, f);
+                }
+        }
     }
     {   /* the parts on and off (SEQ, SEL, GLO, FX), right to left at the top */
         static const char *const TAG[4] = {"REV", "VIB", "PLUS", "AUTO"};
@@ -769,11 +840,6 @@ static void draw_main(void)
             cv_text(x + 4, 2, &FONT_XS, TAG[i], on[i] ? K_WHITE : K_DIM);
             x -= 3;
         }
-    }
-    if (ui.bend) {   /* the bend: a bar from the middle */
-        int32_t m = 196, e = m + ui.bend * 30 / 100;
-        cv_rect(m - 30, 39, 61, 1, K_LINE);
-        cv_round(e < m ? e : m, 37, (e < m ? m - e : e - m) + 2, 5, 2, K_HARP);
     }
     if (ui.view == V_RHYTHM)
         draw_rhythm(44, 62);
@@ -1072,6 +1138,8 @@ static void speak_dump(void)
                         proj.pad_type[0] = (uint8_t)x;
                     else if (k == K_SYNC)
                         proj.sync = (uint8_t)x;
+                    else if (k == K_BEND)
+                        ui.bend = (int16_t)x;
                     else
                         proj.leds = (uint8_t)x;
                     sp_n = 0;

@@ -206,7 +206,7 @@ static void midi(uint32_t st, uint32_t d1, uint32_t d2)
 
 /* ---- harp strings */
 typedef struct {
-    float pos, inc, mpos, v, g, y1, y2, k, c, m, modamt, idec, vg;
+    float pos, inc, mpos, v, g, y1, y2, k, c, m, modamt, idec, vg, pos2, sw, hold;
     uint16_t shim_off;
     uint8_t on, note, inst, atk;
 } str_t;
@@ -233,6 +233,7 @@ static void strum(int s)
     v->inc = note_inc(n);
     v->idec = 1.0f;
     v->vg = 0.0f;
+    v->sw = 1.0f;
     if (ii < 2) {                                /* the OM-84's harp */
         float u = fm_exp2f((float)(n - 69) * (1.0f / 12.0f)) * tunefac, base;
         v->v = 1.0f;
@@ -256,8 +257,8 @@ static void strum(int s)
 /* ---- chord, chord plus: voices of om_voices.h with a gate */
 enum { A_OFF, A_ATK, A_DEC, A_REL, A_CUT };
 typedef struct {
-    float pos, inc, mpos, v, g, y, idec;
-    uint8_t st, base, note, os, ch;              /* os: 0 held, 1 a stab (released at once), 2 rings out */
+    float pos, inc, mpos, v, g, y, idec, pos2, sw, hold;
+    uint8_t st, base, note, os, ch;             /* os: 0 held, 1 a stab (released at once), 2 rings out */
 } av_t;
 #define OM_NPLUS 4
 static av_t chv[OM_NCHORD], plv[OM_NPLUS];
@@ -280,6 +281,7 @@ static void av_trigger(av_t *v, int base, int ii, int os)
     }
     av_note(v, base, ii);
     v->idec = 1.0f;
+    v->sw = 1.0f;
     v->os = (uint8_t)os;
     if (i_ar[ii] > 0.0f) {
         v->st = A_ATK;
@@ -396,8 +398,19 @@ static void retune(void)
 {
     int i;
     om_voicing(root, type, par[P_TRANSPOSE], par[P_OCTAVE], harp_n, chord_n, &bass_n);
-    for (i = 0; i < OM_NSTR; i++)                 /* what each string plays when plucked next */
+    for (i = 0; i < OM_NSTR; i++) {               /* what each string plays when plucked next */
+        str_t *v = &str[i];
         om_str_note[i] = harp_n[i];
+        if (v->on) {                              /* and a string still ringing moves to the new chord */
+            int n = v->inst >= 2 ? clamp_note(harp_n[i] + INST[v->inst].shift) : harp_n[i];
+            if (n != v->note) {
+                midi(0x80, v->note, 0);
+                v->note = (uint8_t)n;
+                v->inc = note_inc(n);
+                midi(0x90, (uint32_t)n, 100);
+            }
+        }
+    }
     {   /* CHORD PLUS: the chord's tones, low to high, an octave up; then the lowest an octave more */
         uint8_t a = chord_n[0], b = chord_n[1], c = chord_n[2], t;
         if (a > b) { t = a; a = b; b = t; }
@@ -861,16 +874,65 @@ static void render_classic(str_t *v, int s, uint32_t n, float inc, float g1, flo
     v->m = m;
 }
 
-/* one of om_voices.h's on a string */
+/* a voice's oscillator, one sample: the carrier (phase-modulated while I > 0), its second layer (W2), and
+ * the sample-and-hold (crush) */
+static inline float osc(const om_inst_t *in, const float *W, const float *W2, float pos, float *mpos, float *pos2,
+                        float *hold, uint32_t j, float inc2, float minc, float I)
+{
+    float x;
+    if (I > 0.0f) {
+        float ph;
+        *mpos = adv(*mpos, minc);
+        ph = pos + I * wave(om_wt[WT_SINE], *mpos);
+        if (ph < 0.0f)
+            ph += 100.0f;
+        else if (ph >= 100.0f)
+            ph -= 100.0f;
+        x = wave(W, ph);
+    } else {
+        x = wave(W, pos);
+    }
+    if (W2) {
+        x += (wave(W2, *pos2) - x) * in->l2mix;
+        *pos2 = adv(*pos2, inc2);
+    }
+    if (in->crush) {
+        if (j % in->crush)
+            x = *hold;
+        else
+            *hold = x;
+    }
+    return x;
+}
+
+/* the pitch sweep: the factor now, and the sweep a chunk on */
+static float sweep_step(const om_inst_t *in, float *sw, uint32_t n)
+{
+    float f;
+    if (in->sweep == 0.0f)
+        return 1.0f;
+    f = fm_exp2f(in->sweep * *sw * (1.0f / 12.0f));
+    *sw *= fm_expf(-(float)n / (OM_SR * fm_maxf(in->swt, 0.005f)));
+    return f;
+}
+
+/* one of om_voices.h's on a string. SUSTAIN scales every voice's fade: at 0 they all go in about a
+ * quarter second (a held voice's longer fade, sdec, comes in as the knob goes up) */
 static void render_voice(str_t *v, int s, uint32_t n, float inc, float gain)
 {
     const om_inst_t *in = &INST[v->inst];
-    const float *W = om_wt[in->wave], *S = om_wt[WT_SINE];
-    const float gl = pan_l[s] * gain, gr = pan_r[s] * gain, sr = sus_rate * i_sdk[v->inst], ar = i_ar[v->inst],
-                minc = inc * in->ratio, idk = i_idk[v->inst], curve = 8.5f * in->curve, rs = rsend * gain;
-    float pos = v->pos, mpos = v->mpos, y = v->y1, e = v->v, g = v->g, c = v->c, I = 0.0f, idec = v->idec;
+    const float *W = om_wt[in->wave], *W2 = in->l2 > 0.0f ? om_wt[in->w2] : 0;
+    const float susf = (float)par[P_SUSTAIN] * 0.01f;
+    float pos = v->pos, mpos = v->mpos, pos2 = v->pos2, hold = v->hold, y = v->y1, e = v->v, g = v->g, c = v->c,
+          I = 0.0f, idec = v->idec;
+    const float incs = inc * sweep_step(in, &v->sw, n);
+    const float gl = pan_l[s] * gain, gr = pan_r[s] * gain,
+                sr = sus_rate * (1.0f + (i_sdk[v->inst] - 1.0f) * susf), ar = i_ar[v->inst],
+                minc = incs * in->ratio, inc2 = incs * in->l2, idk = i_idk[v->inst], curve = 8.5f * in->curve,
+                base = 1.0f - 0.66f * in->curve, rs = rsend * gain;
     int atk = v->atk;
     uint32_t j;
+    inc = incs;
     for (j = 0; j < n; j++) {
         float x, o;
         if (!(j & 15u)) {                       /* every 16 samples: the filter and the FM depth */
@@ -879,18 +941,7 @@ static void render_voice(str_t *v, int s, uint32_t n, float inc, float gain)
             I = in->index * (in->ifloor + (1.0f - in->ifloor) * idec) * 15.915f;
             idec *= idk;
         }
-        if (I > 0.0f) {
-            float ph;
-            mpos = adv(mpos, minc);
-            ph = pos + I * wave(S, mpos);
-            if (ph < 0.0f)
-                ph += 100.0f;
-            else if (ph >= 100.0f)
-                ph -= 100.0f;
-            x = wave(W, ph);
-        } else {
-            x = wave(W, pos);
-        }
+        x = osc(in, W, W2, pos, &mpos, &pos2, &hold, j, inc2, minc, I);
         y += c * (x - y);
         g += 0.05f * (e - g);
         o = y * g;
@@ -905,7 +956,7 @@ static void render_voice(str_t *v, int s, uint32_t n, float inc, float gain)
                 atk = 0;
             }
         } else {
-            e -= sr * (0.34f + curve * e * e * e);
+            e -= sr * (base + curve * e * e * e);
             if (e <= 0.0f) {
                 e = 0.0f;
                 if (g < 1e-4f) {
@@ -918,6 +969,8 @@ static void render_voice(str_t *v, int s, uint32_t n, float inc, float gain)
     }
     v->pos = pos;
     v->mpos = mpos;
+    v->pos2 = pos2;
+    v->hold = hold;
     v->y1 = fm_flush(y);
     v->v = e;
     v->g = g;
@@ -961,13 +1014,15 @@ static void render_strings(uint32_t n)
 static float render_av(av_t *v, int ii, uint32_t n, float gain, float sendg)
 {
     const om_inst_t *in = &INST[ii];
-    const float *W = om_wt[in->wave], *S = om_wt[WT_SINE];
-    const float inc = v->inc * (1.0f + in->vib * 0.000578f * lfo_val), minc = inc * in->ratio,
+    const float *W = om_wt[in->wave], *W2 = in->l2 > 0.0f ? om_wt[in->w2] : 0;
+    const float inc = v->inc * (1.0f + in->vib * 0.000578f * lfo_val) * sweep_step(in, &v->sw, n),
+                minc = inc * in->ratio, inc2 = inc * in->l2,
                 ar = i_ar[ii], idk = i_idk[ii], gt = gain * in->gain * (1.0f - in->trem * (0.5f + 0.5f * lfo_val)),
                 rk = v->os == 1 ? fm_minf(i_rk[ii], 1.0f / (0.18f * OM_SR)) : i_rk[ii],
                 dk = v->os == 2 ? fm_maxf(i_cdk[ii], 1.0f / (1.0f * OM_SR)) : i_cdk[ii],
                 tgt = v->os ? 0.0f : in->sus, ck = 1.0f / (0.004f * OM_SR);
-    float pos = v->pos, mpos = v->mpos, y = v->y, e = v->v, g = v->g, c = 1.0f, I = 0.0f, idec = v->idec;
+    float pos = v->pos, mpos = v->mpos, pos2 = v->pos2, hold = v->hold, y = v->y, e = v->v, g = v->g, c = 1.0f,
+          I = 0.0f, idec = v->idec;
     uint32_t j;
     for (j = 0; j < n; j++) {
         float x, o;
@@ -1002,18 +1057,7 @@ static float render_av(av_t *v, int ii, uint32_t n, float gain, float sendg)
                 break;
             }
         }
-        if (I > 0.0f) {
-            float ph;
-            mpos = adv(mpos, minc);
-            ph = pos + I * wave(S, mpos);
-            if (ph < 0.0f)
-                ph += 100.0f;
-            else if (ph >= 100.0f)
-                ph -= 100.0f;
-            x = wave(W, ph);
-        } else {
-            x = wave(W, pos);
-        }
+        x = osc(in, W, W2, pos, &mpos, &pos2, &hold, j, inc2, minc, I);
         y += c * (x - y);
         g += 0.05f * (e - g);
         o = y * g * gt;
@@ -1024,6 +1068,8 @@ static float render_av(av_t *v, int ii, uint32_t n, float gain, float sendg)
     }
     v->pos = pos;
     v->mpos = mpos;
+    v->pos2 = pos2;
+    v->hold = hold;
     v->y = fm_flush(y);
     v->v = e;
     v->g = g;
